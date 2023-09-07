@@ -1,8 +1,10 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using BaseCollection = Database.Collections.Collection;
 
 namespace Database
 {
+    [Serializable]
     public class Collection : BaseCollection
     {
         public Collection(List<Model> items) : base(items)
@@ -16,6 +18,16 @@ namespace Database
             if (direction.Equals("desc"))
             {
                 this.items.Reverse();
+            }
+
+            return this;
+        }
+
+        public Collection Load(string relations)
+        {
+            foreach (Model item in this.items)
+            {
+                item.Load(relations);
             }
 
             return this;

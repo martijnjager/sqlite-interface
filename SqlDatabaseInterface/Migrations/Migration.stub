@@ -1,0 +1,26 @@
+﻿using Database.Contracts;
+using Database;
+using Database.Migrations;
+
+namespace Server.Database.Migrations.Tables
+{
+    public class {Name}Table : Migration, IMigration
+    {
+        public {Name}Table() : base()
+        {
+
+        }
+
+        public void Down(Blueprint table)
+        {
+            table.DropTable("{Name}");
+        }
+
+        public void Up(Blueprint table)
+        {
+            table.Table("{Name}");
+            table.PrimaryKey();
+            table.Timestamps();
+        }
+    }
+}

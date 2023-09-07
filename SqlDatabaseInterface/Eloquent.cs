@@ -11,13 +11,12 @@ using BaseCollection = Database.Collections.Collection;
 
 namespace Database
 {
-    public delegate void DatabaseCallback();
+    public delegate void DatabaseCallback(Eloquent query);
     public class Eloquent
     {
         protected IDictionary<string, string> clauses;
 
         private readonly IDictionary<string, string> parameters;
-        //protected IDictionary<string, string> Columns { get; set; }
 
         internal IConnection connection;
 
@@ -41,7 +40,6 @@ namespace Database
 
         public Eloquent(string table)
         {
-            //this.Columns = new Dictionary<string, string>();
             this.joins = new List<Join>();
             this.clauses = new Dictionary<string, string>();
             this.parameters = new Dictionary<string, string>();
@@ -204,6 +202,12 @@ namespace Database
             return this;
         }
 
+        public Eloquent Where(DatabaseCallback callback)
+        {
+            callback(this);
+            return this;
+        }
+
         public Eloquent GroupBy(string column)
         {
             this.clauses.Add("groupBy", column);
@@ -240,14 +244,17 @@ namespace Database
             return this;
         }
 
-        public void Load(string relation)
+        public void Load(string relations)
         {
-            string[] relations = relation.Split('.');
-            int index = 0;
-
-            if (relations.Length > 0)
+            foreach (string relation in relations.Split(','))
             {
-                this.LoadRelation(relations, index);
+                string[] r = relation.Split('.');
+                int index = 0;
+
+                if (relations.Length > 0)
+                {
+                    this.LoadRelation(r, index);
+                }
             }
         }
 
@@ -309,18 +316,18 @@ namespace Database
             this.joins.Clear();
 
             List<Model> items = new List<Model>();
-            ParamBag paramBag = InstanceContainer.Get("paramBag");
+            ParamBag paramBag = InstanceContainer.Instance.ParamBag();
 
             while (reader.Read())
             {
                 string table = reader.GetTableName(0);
 
-                Model mainModel = (Model)InstanceContainer.Get(table);
+                Model mainModel = (Model)InstanceContainer.Resolve<Model>(table);
                 List<dynamic> relationModels = new List<dynamic>();
 
                 foreach (string relation in relations)
                 {
-                    relationModels.Add(InstanceContainer.Get(relation));
+                    relationModels.Add(InstanceContainer.Resolve<Model>(relation));
                 }
 
                 for (int i = 0; i < reader.FieldCount; i++)
@@ -375,7 +382,7 @@ namespace Database
         {
             this.HandlePrecautions();
 
-            return GrammarCompiler.Compile(this.clauses, this.joins);
+            return GrammarCompiler.Compile(this.clauses, this.joins, this.parameters);
         }
 
         private void HandlePrecautions()

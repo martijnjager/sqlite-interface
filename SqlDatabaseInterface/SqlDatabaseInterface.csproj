@@ -43,7 +43,13 @@
     <Reference Include="EventDispatcher">
       <HintPath>..\..\EventDispatcher\EventDispatcher\bin\Debug\net6.0-windows\EventDispatcher.dll</HintPath>
     </Reference>
+    <Reference Include="Microsoft.Bcl.AsyncInterfaces, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Bcl.AsyncInterfaces.7.0.0\lib\net462\Microsoft.Bcl.AsyncInterfaces.dll</HintPath>
+    </Reference>
     <Reference Include="System" />
+    <Reference Include="System.Buffers, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Buffers.4.5.1\lib\net461\System.Buffers.dll</HintPath>
+    </Reference>
     <Reference Include="System.ComponentModel.DataAnnotations" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data.Entity" />
@@ -58,6 +64,28 @@
       <HintPath>..\packages\System.Data.SQLite.Linq.1.0.116.0\lib\net46\System.Data.SQLite.Linq.dll</HintPath>
     </Reference>
     <Reference Include="System.Drawing" />
+    <Reference Include="System.Memory, Version=4.0.1.2, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Memory.4.5.5\lib\net461\System.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Numerics" />
+    <Reference Include="System.Numerics.Vectors, Version=4.1.4.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Numerics.Vectors.4.5.0\lib\net46\System.Numerics.Vectors.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Runtime.CompilerServices.Unsafe, Version=6.0.0.0, Culture=neutral, PublicKeyToken=b03f5f7f11d50a3a, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Runtime.CompilerServices.Unsafe.6.0.0\lib\net461\System.Runtime.CompilerServices.Unsafe.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Encodings.Web, Version=7.0.0.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Encodings.Web.7.0.0\lib\net462\System.Text.Encodings.Web.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Text.Json, Version=7.0.0.3, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Text.Json.7.0.3\lib\net462\System.Text.Json.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Threading.Tasks.Extensions, Version=4.2.0.1, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.Threading.Tasks.Extensions.4.5.4\lib\net461\System.Threading.Tasks.Extensions.dll</HintPath>
+    </Reference>
+    <Reference Include="System.ValueTuple, Version=4.0.3.0, Culture=neutral, PublicKeyToken=cc7b13ffcd2ddd51, processorArchitecture=MSIL">
+      <HintPath>..\packages\System.ValueTuple.4.5.0\lib\net47\System.ValueTuple.dll</HintPath>
+    </Reference>
     <Reference Include="System.Xaml" />
     <Reference Include="System.Xml.Linq" />
     <Reference Include="System.Data.DataSetExtensions" />
@@ -70,28 +98,53 @@
     <Compile Include="Boot.cs" />
     <Compile Include="Collection.cs" />
     <Compile Include="Collections\Collection.cs" />
+    <Compile Include="Configuration.cs" />
+    <Compile Include="Config\Structure.cs" />
+    <Compile Include="Console\BaseCommand.cs" />
+    <Compile Include="Console\CommandBag.cs" />
+    <Compile Include="Console\Commands\Migrate.cs" />
+    <Compile Include="Console\Commands\Migration\Make.cs" />
+    <Compile Include="Console\Commands\RevertMigrate.cs" />
+    <Compile Include="Console\Commands\SecurityToken.cs" />
+    <Compile Include="Console\Commands\Token\Migration.cs" />
+    <Compile Include="Contracts\ICommand.cs" />
     <Compile Include="Contracts\IMigration.cs" />
+    <Compile Include="Contracts\IProvider.cs" />
     <Compile Include="Contracts\ISeeder.cs" />
+    <Compile Include="Dispatcher.cs" />
+    <Compile Include="Enums\SaveStatus.cs" />
+    <Compile Include="Exceptions\BaseException.cs" />
+    <Compile Include="Exceptions\DispatchException.cs" />
     <Compile Include="Grammar\Grammar.cs" />
     <Compile Include="Grammar\GrammarCompiler.cs" />
     <Compile Include="InstanceContainer.cs" />
+    <Compile Include="Job.cs" />
     <Compile Include="Migration.cs" />
-    <Compile Include="MigrationModel.cs" />
+    <Compile Include="Models\MigrationModel.cs" />
     <Compile Include="Migrations\Blueprint.cs" />
     <Compile Include="Migrations\Builder.cs" />
     <Compile Include="Factory.cs" />
     <Compile Include="Contracts\IConnection.cs" />
     <Compile Include="Eloquent.cs" />
     <Compile Include="Connection.cs" />
-    <Compile Include="MigrationTable.cs" />
+    <Compile Include="Migrations\Table\MigrationTable.cs" />
     <Compile Include="Model.cs" />
     <Compile Include="ParamBag.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Providers\Provider.cs" />
+    <Compile Include="QueryResult.cs" />
     <Compile Include="Relations\Join.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="App.config" />
+    <None Include="config.json" />
+    <None Include="Dockerfile" />
+    <None Include="Migrations\Migration.stub" />
+    <None Include="Migrations\Model.stub" />
     <None Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include=".gitignore" />
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <Import Project="..\packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.116.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets" Condition="Exists('..\packages\Stub.System.Data.SQLite.Core.NetFramework.1.0.116.0\build\net46\Stub.System.Data.SQLite.Core.NetFramework.targets')" />

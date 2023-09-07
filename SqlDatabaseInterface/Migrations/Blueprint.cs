@@ -15,6 +15,8 @@ namespace Database.Migrations
 
         private List<string> indexes;
 
+        private List<string> droppable;
+
         public string primaryKey { get; private set; }
 
         public Blueprint()
@@ -22,6 +24,7 @@ namespace Database.Migrations
             this._items = new List<Tuple<string, string>>();
             this._foreign = new List<Tuple<string, string>>();
             this.indexes = new List<string>();
+            this.droppable = new List<string>();
         }
 
         public Blueprint PrimaryKey(string id = null)
@@ -144,6 +147,21 @@ namespace Database.Migrations
             return this;
         }
 
+        public void DropColumn(string column)
+        {
+            this.AddDropItem(column);
+        }
+
+        public void DropTable(string table)
+        {
+            this.AddDropItem(table);
+        }
+
+        private void AddDropItem(string column)
+        {
+            droppable.Add(column);
+        }
+
         private void AddItem(string key, string data)
         {
             _items.Add(new Tuple<string, string>(key, data));
@@ -154,5 +172,7 @@ namespace Database.Migrations
         public List<Tuple<string, string>> GetRelations() => this._foreign;
 
         public List<string> GetIndexes() => this.indexes;
+
+        public List<string> GetDroppable() => this.droppable;
     }
 }

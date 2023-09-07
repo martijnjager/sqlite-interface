@@ -1,7 +1,10 @@
 ﻿using Database.Contracts;
 using System.IO;
 using System.Data.SQLite;
-using System.Data;
+using System;
+using Database;
+using Database.Enums;
+using System.Threading.Tasks;
 
 namespace Database
 {
@@ -10,6 +13,7 @@ namespace Database
         const string databaseSource = @"Data Source=database.sqlite";
         const string databaseLocation = "database.sqlite";
         private SQLiteConnection connection;
+        public QueryResult<SaveStatus> Result { get; private set; }
 
         public Connection()
         {
@@ -23,31 +27,46 @@ namespace Database
 
         public string GetDatabasePath()
         {
-            this.connection.Open();
+            if (!this.IsOpen())
+            {
+                this.connection.Open();
+            }
+
             string path = this.connection.FileName;
             this.connection.Close();
 
             return path;
         }
 
-        public int RunNonQuery(string query)
+        public QueryResult<SaveStatus> RunSaveQuery(string query)
         {
             this.connection.Close();
             this.connection.Open();
+            Result = new QueryResult<SaveStatus>();
+            Result.SetStatus(SaveStatus.Pending);
             int numberAffectedRows = 0;
-            using (SQLiteTransaction transaction = this.connection.BeginTransaction())
+            try
             {
-                SQLiteCommand command = connection.CreateCommand();
-                command.CommandText = query;
-                numberAffectedRows = command.ExecuteNonQuery();
-                transaction.Commit();
+                using (SQLiteTransaction transaction = this.connection.BeginTransaction())
+                {
+                    SQLiteCommand command = connection.CreateCommand();
+                    command.CommandText = query;
+                    numberAffectedRows = command.ExecuteNonQuery();
+                    transaction.Commit();
+                    command.Dispose();
+                }
+            } catch (Exception ex)
+            {
+                Result.SetStatus(SaveStatus.Error);
+                Result.SetMessage(ex.Message);
             }
-
             this.connection.Close();
+            Result.SetStatus(SaveStatus.Success);
 
-            InstanceContainer.Get("paramBag").Clear();
+            InstanceContainer.Instance.ParamBag();
+            Result.SetMessage("Number affected rows:" + numberAffectedRows);
 
-            return numberAffectedRows;
+            return Result;
         }
 
         public SQLiteDataReader RunQuery(string query)
@@ -56,8 +75,13 @@ namespace Database
             this.connection.Open();
             SQLiteCommand command = connection.CreateCommand();
             command.CommandText = query;
-            InstanceContainer.Get("paramBag").Clear();
+            InstanceContainer.Instance.ParamBag();
             return command.ExecuteReader();
+        }
+
+        public bool IsOpen()
+        {
+            return this.connection.State == System.Data.ConnectionState.Open;
         }
     }
 }

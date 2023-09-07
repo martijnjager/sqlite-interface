@@ -1,5 +1,7 @@
 ﻿using System.Collections.Generic;
+using System.Data.Common;
 using System.Linq;
+using System.Text;
 
 namespace Database.Grammar
 {
@@ -22,19 +24,19 @@ namespace Database.Grammar
             };
         }
 
-        public static string Compile(IDictionary<string, string> clauses, List<Relations.Join> joins)
+        public static string Compile(IDictionary<string, string> clauses, List<Relations.Join> joins, IDictionary<string, string> parameters)
         {
-            return InstanceContainer.Get("grammarCompiler").GetValues(clauses, joins);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").GetValues(clauses, joins, parameters);
         }
 
         public static string CompileInsertStatement(string table, IDictionary<string, string> attributes)
         {
-            return InstanceContainer.Get("grammarCompiler").CompileInsert(table, attributes);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileInsert(table, attributes);
         }
 
         public static string CompileUpdateStatement(string table, IDictionary<string, string> attributes)
         {
-            return InstanceContainer.Get("grammarCompiler").CompileUpdate(table, attributes);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileUpdate(table, attributes);
         }
 
         public static string CompileDeleteStatement(Model model, IDictionary<string, string> attributes)
@@ -46,35 +48,40 @@ namespace Database.Grammar
                 return CompileUpdateStatement(table, attributes);
             }
 
-            return InstanceContainer.Get("grammarCompiler").CompileDelete(table, attributes);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileDelete(table, attributes);
         }
 
         public static string CompileCreateTableStatement(string table)
         {
-            return InstanceContainer.Get("grammarCompiler").CompileCreateTable(table);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileCreateTable(table);
         }
 
         public static string CompileAlterTableStatement(string table)
         {
-            return InstanceContainer.Get("grammarCompiler").CompileAlterTable(table);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileAlterTable(table);
         }
 
         public static string CompileColumnStatement(string column, string definitions)
         {
-            return InstanceContainer.Get("grammarCompiler").CompileColumn(column, definitions);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileColumn(column, definitions);
         }
 
         public static string CompileForeignKeyStatement(string column, string definitions)
         {
-            return InstanceContainer.Get("grammarCompiler").CompileForeignKey(column, definitions);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileForeignKey(column, definitions);
         }
 
         public static string CompileIndexStatement(string column, string table)
         {
-            return InstanceContainer.Get("grammarCompiler").CompileIndex(column, table);
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileIndex(column, table);
         }
 
-        private string GetValues(IDictionary<string, string> clauses, List<Relations.Join> joins)
+        public static string CompileDropTableStatement(string table)
+        {
+            return InstanceContainer.Get<GrammarCompiler>("GrammarCompiler").CompileDropTable(table);
+        }
+
+        private string GetValues(IDictionary<string, string> clauses, List<Relations.Join> joins, IDictionary<string, string> parameters)
         {
             string query = "";
 
@@ -98,6 +105,11 @@ namespace Database.Grammar
                 if (clauses.ContainsKey(item))
                 {
                     query += this.PrepareClause(item, clauses[item]);
+                }
+
+                if (item == "orderBy")
+                {
+                    query += this.ProcessOrderBy(parameters);
                 }
             }
 
@@ -128,6 +140,23 @@ namespace Database.Grammar
             }
 
             return sql;
+        }
+
+        private string ProcessOrderBy(IDictionary<string, string> parameters)
+        {
+            StringBuilder orderBys = new StringBuilder();
+
+            var orderByParameters = parameters.Where((param) =>
+            {
+                return param.Key.StartsWith(":o");
+            });
+
+            foreach (KeyValuePair<string, string> pair in orderByParameters)
+            {
+                orderBys.Append(this.CompileOrderBy(pair));
+            }
+
+            return orderBys.ToString();
         }
     }
 }

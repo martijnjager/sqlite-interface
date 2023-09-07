@@ -3,10 +3,11 @@ using Database.Migrations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SqlDatabaseInterface.Migrations
+namespace Database.Migrations
 {
     internal class Builder
     {
@@ -14,14 +15,25 @@ namespace SqlDatabaseInterface.Migrations
         {
             StringBuilder query = new StringBuilder();
 
-            List<Tuple<string, string>> definitions = blueprint.GetDefinitions();
+            if (blueprint.GetDefinitions().Count > 0 )
+            {
+                ProcessCreate(blueprint, query);
+            } else
+            {
+                ProcessDrop(blueprint, query);
+            }
 
-            string table = definitions[0].Item1;
+            return query.ToString();
+        }
+
+        private static void ProcessCreate(Blueprint blueprint, StringBuilder query)
+        {
+            string table = blueprint.GetDefinitions()[0].Item1;
 
             query.Append(GrammarCompiler.CompileCreateTableStatement(table));
-            definitions.RemoveAt(0);
+            blueprint.GetDefinitions().RemoveAt(0);
 
-            foreach (Tuple<string, string> definition in definitions)
+            foreach (Tuple<string, string> definition in blueprint.GetDefinitions())
             {
                 query.Append(GrammarCompiler.CompileColumnStatement(definition.Item1, definition.Item2));
                 query.Append(",");
@@ -43,8 +55,20 @@ namespace SqlDatabaseInterface.Migrations
             {
                 query.Append(GrammarCompiler.CompileIndexStatement(index, table));
             }
+        }
+        
+        private static void ProcessDrop(Blueprint blueprint, StringBuilder query)
+        {
+            List<string> droppable = blueprint.GetDroppable();
 
-            return query.ToString();
+            // Drop table
+            if (droppable.Count == 1)
+            {
+                query.Append(GrammarCompiler.CompileDropTableStatement(droppable[0]));
+            } else
+            {
+
+            }
         }
     }
 }

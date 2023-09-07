@@ -9,9 +9,9 @@ namespace Database.Contracts
 {
     public interface IMigration
     {
-        Blueprint Up();
+        void Up(Blueprint table);
         //IDictionary<string, string> Up();
 
-        string Down();
+       void Down(Blueprint table);
     }
 }

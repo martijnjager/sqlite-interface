@@ -1,10 +1,10 @@
-﻿using Database.Grammar;
-using SqlDatabaseInterface;
+﻿using Database.Providers;
+using Database.Console;
+using Database.Console.Commands;
+using Database.Console.Commands.Migration;
+using Database.Grammar;
 using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+using Command = Database.Console.BaseCommand;
 
 namespace Database
 {
@@ -12,9 +12,15 @@ namespace Database
     {
         public static void Start()
         {
-            InstanceContainer.RegisterSingleton<ParamBag>("paramBag");
-            InstanceContainer.RegisterSingleton<GrammarCompiler>("grammarCompiler");
-            BindModel<MigrationModel>("migrations");
+            InstanceContainer.RegisterSingleton<ParamBag>();
+            InstanceContainer.RegisterSingleton<GrammarCompiler>();
+            InstanceContainer.RegisterSingleton<Command>();
+            InstanceContainer.RegisterSingleton<Configuration>();
+            InstanceContainer.RegisterSingleton<Dispatcher>();
+            InstanceContainer.RegisterSingleton<Provider>();
+            Command.RegisterCommand<Migrate>();
+            Command.RegisterCommand<RevertMigrate>();
+            Command.RegisterCommand<Make>();
         }
 
         public static void RegisterMigration<T>()
@@ -22,19 +28,44 @@ namespace Database
             Migration.RegisterMigration<T>();
         }
 
-        public static void BindModel<T>(string model)
-        {
-            InstanceContainer.Bind<T>(model);
-        }
-
         public static void RegisterSeeder<T>()
         {
             Migration.RegisterSeeder<T>();
         }
-
-        public static void RunMigrations()
+        public static void RegisterProvider<T>()
         {
-            Migration.RunMigrations();
+            InstanceContainer.Get<Provider>().Register<T>();
+        }
+
+        public static ParamBag ParamBag(this InstanceContainer app)
+        {
+            return app.GetInstance<ParamBag>();
+        }
+
+        public static Command BaseCommand(this InstanceContainer app)
+        {
+            return app.GetInstance<Command>();
+        }
+
+        public static Configuration Configuration(this InstanceContainer app)
+        {
+            return app.GetInstance<Configuration>();
+        }
+
+        public static void Restart(this InstanceContainer app)
+        {
+            System.Diagnostics.Process.Start(AppDomain.CurrentDomain.FriendlyName);
+            Environment.Exit(0);
+        }
+
+        public static Dispatcher Dispatcher(this InstanceContainer app)
+        {
+            return app.GetInstance<Dispatcher>();
+        }
+
+        public static void Dispatch<T>(this InstanceContainer app, object data = null)
+        {
+            Dispatcher(app).Dispatch<T>(data);
         }
     }
 }

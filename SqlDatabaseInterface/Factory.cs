@@ -14,6 +14,11 @@ namespace Database
             return Activator.CreateInstance<T>();
         }
 
+        public static T Create<T>(params object[] data)
+        {
+            return (T)Activator.CreateInstance(typeof(T), data);
+        }
+
         public static dynamic Create(Type type)
         {
             return Activator.CreateInstance(type);

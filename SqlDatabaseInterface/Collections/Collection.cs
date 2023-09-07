@@ -8,7 +8,7 @@ using System.Threading.Tasks;
 
 namespace Database.Collections
 {
-    public class Collection : ICollection<Model>
+    public class Collection : ICollection<Model>, IEnumerable<Model>
     {
         protected List<Model> items;
 
@@ -89,7 +89,7 @@ namespace Database.Collections
 
         public IEnumerator<Model> GetEnumerator()
         {
-            return null;
+            return this.items.GetEnumerator();
         }
 
         public bool Remove(Model item)
@@ -104,7 +104,7 @@ namespace Database.Collections
 
         IEnumerator IEnumerable.GetEnumerator()
         {
-            return null;
+            return this.GetEnumerator();
         }
 
         public Array ToArray()

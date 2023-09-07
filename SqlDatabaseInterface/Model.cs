@@ -1,15 +1,17 @@
 ﻿using Database.Collections;
 using Database.Grammar;
 using Microsoft.Win32;
+using Database;
+using Database.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Runtime.CompilerServices;
-//using EventDispatcher;
+using System.Threading.Tasks;
 
 namespace Database
 {
-    public abstract class Model : Eloquent
+    public class Model : Eloquent
     {
         protected delegate void creating();
         protected delegate void updating();
@@ -29,14 +31,14 @@ namespace Database
                 this.RegisterTimestampEvents();
             }
         }
-        
+
         public dynamic GetValue(string column)
         {
             if (this.DefaultAttributes.ContainsKey(column))
             {
                 string value = this.Attributes[column];
 
-                if (this.casts != null)
+                if (this.casts != null && !string.IsNullOrEmpty(value))
                 {
                     foreach (Tuple<string, Type> cast in this.casts)
                     {
@@ -68,7 +70,7 @@ namespace Database
 
         public Model Assign(ParamBag data)
         {
-            foreach(Tuple<string, string> parameter in data.GetParameters())
+            foreach (Tuple<string, string> parameter in data.GetParameters())
             {
                 if (this.DefaultAttributes.ContainsKey(parameter.Item1))
                 {
@@ -79,27 +81,28 @@ namespace Database
             return this;
         }
 
-        public void Delete()
+        public QueryResult<SaveStatus> Delete()
         {
             try
             {
                 this.delete?.Invoke();
-                string sqlStatement = GrammarCompiler.CompileDeleteStatement(this, this.Attributes);
+
+                string sqlStatement = GrammarCompiler.CompileDeleteStatement(this, this.AttributesByKeys(new[] { this.PrimaryKey, "deleted_at" }));
 
                 this.clauses.Clear();
 
-                this.connection.RunNonQuery(sqlStatement);
+                this.connection.RunSaveQuery(sqlStatement);
+            } catch (Exception ex) {
+                System.Console.WriteLine(ex.Message);
             }
-            catch (Exception)
-            {
-                throw;
-            }
+
+            return this.connection.Result;
         }
 
-        public T Save<T>()
+        public QueryResult<SaveStatus> Save<T>()
         {
             string sqlStatement = string.Empty;
-            bool isNew = true;
+            bool isNew = false;
             Model model = null;
 
             string primaryKey = this.GetValue(this.PrimaryKey);
@@ -108,24 +111,49 @@ namespace Database
             if (string.IsNullOrEmpty(primaryKey))
             {
                 this.create?.Invoke();
-                sqlStatement = GrammarCompiler.CompileInsertStatement(this.GetTable(), this.Attributes);
+                sqlStatement = GrammarCompiler.CompileInsertStatement(this.GetTable(), this.AttributesByKeys());
                 isNew = true;
             }
             else
             {
                 this.update?.Invoke();
-                sqlStatement = GrammarCompiler.CompileUpdateStatement(this.GetTable(), this.Attributes);
+                sqlStatement = GrammarCompiler.CompileUpdateStatement(this.GetTable(), this.AttributesByKeys());
             }
 
             this.clauses.Clear();
 
-            this.connection.RunNonQuery(sqlStatement);
+            this.connection.RunSaveQuery(sqlStatement);
 
-            var tempModel = (Model)InstanceContainer.Get(this.GetTable());
+            QueryResult<SaveStatus> result = this.connection.Result;
+
+            var tempModel = InstanceContainer.Resolve<Model>(this.GetTable());
 
             model = isNew ? tempModel.Get().Last() : tempModel.Find(this.Attributes[this.PrimaryKey]);
 
-            return (T)Convert.ChangeType(model, typeof(T));
+            result.SetData(model);
+
+            return result;
+        }
+
+        private IDictionary<string, string> AttributesByKeys(string[] keys = null)
+        {
+            IDictionary<string,string> dictionary = new Dictionary<string, string>();
+
+            if (keys != null)
+            {
+                foreach (string key in keys)
+                {
+                    if (this.Attributes.ContainsKey(key))
+                    {
+                        dictionary.Add(key, this.Attributes[key]);
+                    }
+                }
+            } else
+            {
+                dictionary = this.Attributes;
+            }
+
+            return dictionary;
         }
 
         private void HandleTimestamp()

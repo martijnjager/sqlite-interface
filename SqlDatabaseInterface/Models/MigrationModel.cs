@@ -5,7 +5,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace SqlDatabaseInterface
+namespace Database.Models
 {
     internal class MigrationModel : Model
     {

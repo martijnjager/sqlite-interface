@@ -84,12 +84,12 @@ namespace Database.Grammar
 
             foreach (KeyValuePair<string, string> d in attributes)
             {
-                statement.Append(d.Key + " = '" + d.Value + "',");
+                statement.Append(d.Key + " = '" + d.Value + "' and ");
             }
 
-            if (statement.ToString().EndsWith(","))
+            if (statement.ToString().EndsWith(" and "))
             {
-                statement.Remove(statement.Length - 1, 1);
+                statement.Remove(statement.Length - 5, 5);
             }
 
             statement.Append(this.CompileEndOfString());
@@ -155,6 +155,16 @@ namespace Database.Grammar
         protected string CompileIndex(string column, string table)
         {
             return "create unique index if not exists idx_" + column + "_" + table + " on " + table + "(" + column + ")" + this.CompileEndOfString();
+        }
+
+        protected string CompileDropTable(string table)
+        {
+            return "PRAGMA foreign_keys = OFF; drop table if exists " + table +  "; PRAGMA foreign_keys = ON" + this.CompileEndOfString();
+        }
+
+        protected string CompileOrderBy(KeyValuePair<string, string> order)
+        {
+            return " order by " + order.Key.Remove(0, 2) + " " + order.Value;
         }
     }
 }
