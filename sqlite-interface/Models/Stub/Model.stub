@@ -1,0 +1,12 @@
+﻿using Database;
+
+namespace Server.Database.Models
+{
+    public class {Name} : Model
+    {
+        public {Name}() : base("{Name}")
+        {
+            base.timestamps = true;
+        }
+    }
+}
