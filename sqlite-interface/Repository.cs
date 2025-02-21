@@ -2,6 +2,7 @@
 using Database.Contracts;
 using Database.Enums;
 using Database.Relations;
+using System.Reflection;
 
 namespace Database
 {
@@ -9,56 +10,77 @@ namespace Database
     {
         protected TModel _model;
 
-        protected const int OPERATION_WAIT_TIME = 1000;
-
         public Repository()
         {
-            this._model = (TModel?)InstanceContainer.ModelByKey(typeof(TModel).Name);
-        }
-
-        public QueryResult<SaveStatus> Save(ParamBag data)
-        {
-            Model m = this.GetModel();
-            m.Assign(data);
-            return m.Save<TModel>();
-        }
-
-        public QueryResult<SaveStatus> Update(ParamBag data)
-        {
-            Model m= this.GetModel();
-            var primaryKey = m.GetKeys().First();
-
-            if (m.Find<TModel>(primaryKey).GetValue(primaryKey) == null)
+            var model = InstanceContainer.ModelByKey(typeof(TModel).Name);
+            
+            if (model is null)
             {
-                throw new Exception("Cant update model");
+                throw new InvalidOperationException($"Model for type {typeof(TModel).Name} not found.");
             }
 
-            m.Assign(data);
-            return m.Save<TModel>();
+            this._model = (TModel)model;
         }
 
-        public IModel FindBy(string key, string value, string? relations = null)
+        public IModel Save(ParamBag data)
         {
-            IModel? model = this.GetModel().Where(key, value).First<Model>();
+            Model? m = this.GetModel();
 
-            if (model is not null && relations is not null)
+            if (m is not null)
             {
-                model.Load(relations);
+                m.Assign(data);
+                return m.Create<TModel>();
             }
 
-            return model;
+            throw new InvalidOperationException("Model not found.");
         }
 
-        public List<IModel> FindWhere(string key, string value, string? relations = null)
+        public IModel Update(string id, ParamBag data)
         {
-            List<IModel> models = this.GetModel().Where(key, value).Get<Model>();
+            IModel? foundModel = this.GetModel()?.Find<TModel>(id);
+
+            if (foundModel is not null)
+            {
+                foundModel.Assign(data);
+                return foundModel.Update<TModel>();
+            }
+
+            throw new InvalidOperationException("Model not found.");
+        }
+
+        public IModel? FindBy(string key, string value, string? relations = null, string[]? except = null)
+        {
+            var query = this.GetModel()?.Where(key, value);
+
+            if (except is not null)
+            {
+                this.DontSelect(except);
+            }
+
+            var foundModel = query.First<Model>();
+
+            if (foundModel is not null && relations is not null)
+            {
+                foundModel.Load(relations);
+            }
+
+            return foundModel;
+        }
+
+        public List<IModel> FindWhere(string key, string value, string? relations = null, string[]? except = null)
+        {
+            var query = this.GetModel().With(relations).Where(key, value);
+
+            if (except is not null)
+            {
+                this.DontSelect(except);
+            }
+
+            var models = query.Get<IModel>();
 
             if (relations is not null)
             {
-                foreach (Model model in models.Cast<Model>())
-                {
-                    model.Load(relations);
-                }
+                RelationManager.LoadRelations(this.GetModel().Relations.ToEagerLoad(), models);
             }
 
             return models;
@@ -80,18 +102,6 @@ namespace Database
         {
             List<IModel> models = this.GetModel().With(relations).Get<Model>();
 
-            if (relations is not null)
-            {
-                var ids = models.Select(m => m.GetValue("id")).Distinct().ToArray();
-
-                RelationManager.LoadRelations(this.GetModel().Relations.ToEagerLoad(), models);
-
-                //foreach (Model model in models.Cast<Model>())
-                //{
-                //    model.Load(relations);
-                //}
-            }
-
             return models;
         }
 
@@ -100,6 +110,14 @@ namespace Database
             this._model = model;
         }
 
-        public Model GetModel() => this._model as Model;
+        public Model? GetModel()
+        {
+            return this._model as Model;
+        }
+
+        protected void DontSelect(params string[] key)
+        {
+            this.GetModel().DontSelect(key);
+        }
     }
 }

@@ -9,11 +9,11 @@ namespace Database.Contracts
 {
     public interface IRepository<TModel> where TModel : IModel
     {
-        QueryResult<SaveStatus> Save(ParamBag data);
+        IModel Save(ParamBag data);
 
-        IModel FindBy(string key, string value, string? relations = null);
+        IModel FindBy(string key, string value, string? relations = null, string[]? except = null);
 
-        List<IModel> FindWhere(string key, string value, string? relations = null);
+        List<IModel> FindWhere(string key, string value, string? relations = null, string[]? except = null);
 
         IModel Get(string id, string? relations = null);
 
@@ -21,6 +21,6 @@ namespace Database.Contracts
 
         void SetModel(TModel model);
 
-        QueryResult<SaveStatus> Update(ParamBag data);
+        IModel Update(string id, ParamBag data);
     }
 }

@@ -5,21 +5,21 @@ using Database.Console;
 using System.Data.Common;
 using Database.Transactions;
 
-namespace Database
+namespace Database.Connection
 {
-    public class Connection : IConnection
+    public abstract class BaseConnection : IConnection
     {
         const string databaseSource = @"Data Source=database.sqlite";
         const string databaseLocation = "database.sqlite";
         const string testDatabaseSource = ":memory:";
         private SQLiteConnection? connection = null;
 
-        public QueryResult<SaveStatus> Result { get; private set; }
+        public QueryResult<SaveStatus> Result { get; protected set; }
 
-        public Connection(string? location = null, string? source = null)
+        public BaseConnection(string? location = null, string? source = null)
         {
-            this.SetConnection(source ?? databaseSource, location ?? databaseLocation);
-            this.Result = new QueryResult<SaveStatus>();
+            SetConnection(source ?? databaseSource, location ?? databaseLocation);
+            Result = new QueryResult<SaveStatus>();
         }
 
         public void SetConnection(string source, string? location = null)
@@ -41,15 +41,15 @@ namespace Database
 
         public string GetDatabasePath()
         {
-            if (this.connection is null)
+            if (connection is null)
             {
                 throw new InvalidOperationException("Connection is not initialized.");
             }
 
-            this.OpenConnection();
+            OpenConnection();
 
-            string path = this.connection.FileName;
-            this.connection.Close();
+            string path = connection.FileName;
+            connection.Close();
 
             return path;
         }
@@ -60,14 +60,14 @@ namespace Database
             Result.SetStatus(SaveStatus.Pending);
             try
             {
-                if (this.connection is null)
+                if (connection is null)
                 {
                     throw new InvalidOperationException("Connection is not initialized.");
                 }
 
-                this.OpenConnection();
-                SQLiteTransaction transaction = this.connection.BeginTransaction();
-                SQLiteCommand command = this.connection.CreateCommand();
+                OpenConnection();
+                SQLiteTransaction transaction = connection.BeginTransaction();
+                SQLiteCommand command = connection.CreateCommand();
                 command.CommandText = query;
                 int numberAffectedRows = command.ExecuteNonQuery();
                 transaction.Commit();
@@ -83,7 +83,7 @@ namespace Database
             }
             finally
             {
-                this.CloseConnection();
+                CloseConnection();
             }
 
             return Result;
@@ -109,7 +109,7 @@ namespace Database
                         numberAffectedRows = transaction.Query.ExecuteNonQuery();
                         break;
                 }
-                
+
                 Result.SetStatus(SaveStatus.Success);
                 Result.SetReader(reader);
                 Result.SetMessage("Number affected rows:" + numberAffectedRows);
@@ -153,22 +153,38 @@ namespace Database
 
         public bool IsOpen()
         {
-            return this.connection?.State == System.Data.ConnectionState.Open;
+            return connection?.State == System.Data.ConnectionState.Open;
         }
 
         public void OpenConnection()
         {
-            if (!this.IsOpen())
+            if (!IsOpen())
             {
-                this.connection?.Open();
+                connection?.Open();
             }
         }
 
         public void CloseConnection()
         {
+            if (IsOpen())
+            {
+                connection?.Close();
+            }
+        }
+
+        public async Task OpenConnectionAsync()
+        {
+            if (!this.IsOpen())
+            {
+                await this.connection?.OpenAsync();
+            }
+        }
+
+        public async Task CloseConnectionAsync()
+        {
             if (this.IsOpen())
             {
-                this.connection?.Close();
+                await this.connection?.CloseAsync();
             }
         }
     }

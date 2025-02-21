@@ -7,6 +7,10 @@ using System.Data;
 using System.Runtime.CompilerServices;
 using System.Data.Common;
 using System.Collections.ObjectModel;
+using Database.Contracts.Connection;
+using Database.Connection;
+using Database.Events;
+using Database.Relations;
 
 namespace Database.Transactions
 {
@@ -15,23 +19,28 @@ namespace Database.Transactions
     /// </summary>
     public class TransactionManager : ITransactionManager
     {
-        private Transaction? transaction;
+        //private Transaction? transaction;
 
-        private readonly IConnection connection;
+        //private readonly IConnection connection;
 
-        public bool IsTransactionInProgress => this.transaction is not null;
+        //public bool IsTransactionInProgress => this.transaction is not null;
+
+        private readonly IReader reader;
+
+        private IWriter writer;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TransactionManager"/> class.
         /// </summary>
         public TransactionManager()
         {
-            this.connection = new Connection();
+            this.reader = new Reader();
         }
 
         public void SetConnection(string location, string source)
         {
-            this.connection?.SetConnection(source, location);
+            this.reader?.SetConnection(source, location);
+            this.writer?.SetConnection(source, location);
         }
 
         /// <summary>
@@ -40,34 +49,24 @@ namespace Database.Transactions
         /// <param name="model">The model to run the transaction on.</param>
         /// <param name="operation">The operation to perform on the model.</param>
         /// <returns>The result of the transaction.</returns>
-        public static QueryResult<SaveStatus> Run(ClauseManager clauseManager)
+        public static QueryResult<SaveStatus> Save(ClauseManager clauseManager)
         {
-            if (Instance.IsTransactionInProgress)
+            if (Instance.writer is not null)
             {
                 throw new Exception("A transaction is already in progress.");
             }
 
-            Instance.connection.OpenConnection();
-            var sqliteTransaction = Instance.connection.SqliteConnection().BeginTransaction();
-
-            Instance.transaction = clauseManager.Compile();
-
-            if (Instance.transaction.Type == Type.TYPE_SELECT)
+            if (clauseManager.QueryType == Type.TYPE_SELECT)
             {
-                throw new Exception("Cannot run a select query with this function.");
+                throw new Exception("Cannot save a select query.");
             }
 
-            QueryResult<SaveStatus> result = Instance.connection.RunQuery(Instance.transaction);
+            Instance.writer = new Writer();
 
-            if (result.Status == SaveStatus.Error)
-            {
-                throw new Exception(result.Message);
-            }
+            QueryResult<SaveStatus> result = Instance.writer.Save(clauseManager);
 
-            sqliteTransaction.Commit();
-            sqliteTransaction.Dispose();
-            Instance.transaction.Query.Dispose();
-            Instance.connection.CloseConnection();
+            Instance.writer.Dispose();
+            Instance.writer = null;
 
             return result;
         }
@@ -77,33 +76,22 @@ namespace Database.Transactions
         /// </summary>
         /// <typeparam name="T">The type of the models.</typeparam>
         /// <returns>A list of models.</returns>
-        public List<IModel> Run<T>(ClauseManager clauseManager) where T : IModel
+        public List<IModel> Read<T>(ClauseManager clauseManager) where T : IModel
         {
-            if (Instance.IsTransactionInProgress)
-            {
-                throw new Exception("A transaction is already in progress.");
-            }
-
-            Instance.transaction = clauseManager.Compile();
-
-            Instance.connection.OpenConnection();
-            var sqliteTransaction = Instance.connection.SqliteConnection().BeginTransaction();
-
-            if (Instance.transaction.Type != Type.TYPE_SELECT)
+            if (clauseManager.QueryType != Type.TYPE_SELECT)
             {
                 throw new Exception("Transaction must be a select query with this function.");
             }
 
-            QueryResult<SaveStatus> result = Instance.connection.RunQuery(Instance.transaction);
+            List<IModel> models = this.reader.Read<T>(clauseManager);
 
-            if (result.Reader is null)
+            if (clauseManager.Relations is not null)
             {
-                return new List<IModel>();
+                if (clauseManager.Relations.Count > 0)
+                {
+                    RelationManager.LoadRelations(clauseManager.Relations, models);
+                }
             }
-
-            List<IModel> models = Process<T>(result.Reader);
-
-            Instance.transaction = null;
 
             return models;
         }
@@ -112,54 +100,8 @@ namespace Database.Transactions
         /// Gets the connection used by the manager.
         /// </summary>
         /// <returns>The connection used by the manager.</returns>
-        public IConnection GetConnection() => Instance.connection;
+        public IConnection GetConnection() => Instance.reader;
 
         protected static TransactionManager Instance => InstanceContainer.Instance.ConnectionManager();
-
-        /// <summary>
-        /// Processes the query and returns a list of models.
-        /// </summary>
-        /// <typeparam name="T">The type of the models.</typeparam>
-        /// <param name="query">The query to process.</param>
-        /// <returns>A list of models.</returns>
-        private static List<IModel> Process<T>(SQLiteDataReader reader) where T : IModel
-        {
-            List<IModel> items = new();
-
-            if (reader is null || !reader.HasRows)
-            {
-                return items;
-            }
-
-            var defaultColumns = reader.GetColumnSchema();
-            string table = reader.GetTableName(0);
-
-            while (reader.Read())
-            {
-                IModel? mainModel = CreateFromReader<T>(reader, table, defaultColumns);
-
-                items.Add(mainModel);
-            }
-
-            return items;
-        }
-
-        private static IModel? CreateFromReader<T>(SQLiteDataReader reader, string table, ReadOnlyCollection<DbColumn> defaultColumns) where T : IModel
-        {
-            ParamBag paramBag = new();
-            IModel? mainModel = InstanceContainer.ModelByKey(table, defaultColumns);
-
-            for (int i = 0; i < reader.FieldCount; i++)
-            {
-                string key = reader.GetName(i);
-                string? value = reader[i].ToString();
-
-                paramBag.Add(key, value);
-            }
-
-            mainModel?.Assign(paramBag);
-
-            return mainModel;
-        }
     }
 }

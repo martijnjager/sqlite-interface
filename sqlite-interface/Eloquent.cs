@@ -12,6 +12,8 @@ using Database.Extensions.Model;
 using Database.Contracts.Attribute;
 using System;
 using Database.Extensions.Model.Attribute;
+using Database.Contracts.Event;
+using System.Data.Entity.Core.Objects.DataClasses;
 
 namespace Database
 {
@@ -36,14 +38,28 @@ namespace Database
             this.Attributes = new AttributeManager();
             this.Attributes.SetPrimaryKey(string.Empty);
             this.clauses = new ClauseManager(this.SetTable());
+
+            if (this is IEvent)
+            {
+                this.RegisterEvents();
+            }
         }
 
-        private string SetTable(string table = null)
+        /// <summary>
+        /// Sets the table name.
+        /// </summary>
+        /// <param name="table"></param>
+        /// <returns>The name of the table</returns>
+        private string? SetTable(string? table = null)
         {
             if (string.IsNullOrEmpty(table))
             {
-                TableNameAttribute tableName = (TableNameAttribute)System.Attribute.GetCustomAttribute(this.GetType(), typeof(TableNameAttribute));
-                table = tableName.Name;
+                var tableName = System.Attribute.GetCustomAttribute(this.GetType(), typeof(TableNameAttribute));
+
+                if (tableName is TableNameAttribute attribute)
+                {
+                    table = attribute.Name;
+                }
             }
 
             return table;
@@ -81,11 +97,12 @@ namespace Database
         /// Finds a model by the specified key.
         /// </summary>
         /// <typeparam name="T">The type of the model.</typeparam>
-        /// <param name="key">The key to search for.</param>
+        /// <param name="value">The value to search for.</param>
         /// <returns>The found model.</returns>
-        public IModel? Find<T>(string key) where T : IModel
+        public IModel? Find<T>(string value) where T : IModel
         {
-            List<IModel> result = this.Where("id", key).Get<T>();
+            string primaryKey = this.Attributes.PrimaryKey;
+            List<IModel> result = this.Where(primaryKey, value).Get<T>();
 
             return result.FirstOrDefault();
         }
@@ -100,6 +117,31 @@ namespace Database
             foreach (var column in columns)
             {
                 this.clauses.AddSelectColumn(column);
+            }
+
+            return this;
+        }
+
+        /// <summary>
+        /// Sets the columns to select except the ones specified.
+        /// </summary>
+        /// <param name="columns">The columns not selected</param>
+        /// <returns>The <see cref="Eloquent"/> instance.</returns>
+        public Eloquent DontSelect(params string[] columns)
+        {
+            foreach (var column in columns)
+            {
+                this.clauses.DontSelectColumn(column);
+            }
+
+            return this;
+        }
+
+        public Eloquent RemoveDontSelect(params string[] columns)
+        {
+            foreach (var column in columns)
+            {
+                this.clauses.RemoveDontSelect(column);
             }
 
             return this;
@@ -143,13 +185,13 @@ namespace Database
         /// <param name="op">The operator to use.</param>
         /// <param name="value">The value to compare.</param>
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
-        public Eloquent Where(string where, string op, string value = null)
+        public Eloquent Where(string where, string op, string? value = null)
         {
-            if (value == null)
+            if (value is null)
             {
                 value = op;
 
-                op = "=";
+                op = Operator.Equals;
             }
 
             this.clauses.AddWhereClause(where, op, value);
@@ -171,7 +213,7 @@ namespace Database
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
         public Eloquent WhereNull(string where)
         {
-            this.Where(where, "is", "null");
+            this.Where(where, Operator.Is, "null");
 
             return this;
         }
@@ -183,18 +225,18 @@ namespace Database
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
         public Eloquent WhereNotNull(string where)
         {
-            this.Where(where, "is not", "null");
+            this.Where(where, Operator.IsNot, "null");
 
             return this;
         }
 
-        public Eloquent OrWhere(string where, string op, string value = null)
+        public Eloquent OrWhere(string where, string op, string? value = null)
         {
-            if (value == null)
+            if (value is null)
             {
                 value = op;
 
-                op = "=";
+                op = Operator.Equals;
             }
 
             this.clauses.AddOrWhereClause(where, op, value);
@@ -233,12 +275,12 @@ namespace Database
         /// <param name="op">The operator to use.</param>
         /// <param name="value">The value to compare.</param>
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
-        public Eloquent Having(string have, string op, string value = null)
+        public Eloquent Having(string have, string op, string? value = null)
         {
-            if (value == null)
+            if (value is null)
             {
                 value = op;
-                op = "=";
+                op = Operator.Equals;
             }
 
             this.clauses.AddHavingClause(have, op, value);
@@ -246,12 +288,12 @@ namespace Database
             return this;
         }
 
-        public Eloquent OrHaving(string have, string op, string value = null)
+        public Eloquent OrHaving(string have, string op, string? value = null)
         {
-            if (value == null)
+            if (value is null)
             {
                 value = op;
-                op = "=";
+                op = Operator.Equals;
             }
 
             this.clauses.AddOrHavingClause(have, op, value);
@@ -311,13 +353,14 @@ namespace Database
         /// </summary>
         /// <typeparam name="T">The type of the model.</typeparam>
         /// <returns>A list of models.</returns>
+        /// <exception cref="">Thrown when an exception occurs.</exception>
         public List<IModel> Get<T>() where T : IModel
         {
             this.HandlePrecautions();
 
-            var result = InstanceContainer.Instance.ConnectionManager().Run<T>(this.clauses);
+            TransactionManager manager = InstanceContainer.Instance.ConnectionManager();
 
-            //var modelIds = result.Select(m => m.GetValue("id")).Distinct().ToArray();
+            var result = manager.Read<T>(this.clauses);
 
             this.clauses.ClearClauses();
             this.Relations.Reset();
@@ -331,35 +374,127 @@ namespace Database
         /// <returns>The result of the delete operation.</returns>
         public QueryResult<SaveStatus> Delete()
         {
-            var result = new QueryResult<SaveStatus>();
-            try
+            // check soft delete, then delete
+            if (this is IUseTimestamps)
             {
-                // check soft delete, then delete
-                if (this is IUseTimestamps)
-                {
-                    this.clauses.AddSoftDeleteClause();
-                } else
-                {
-                    this.clauses.AddDeleteClause();
-                }
-
-                this.CompileAttributesToClause(Transactions.Type.TYPE_DELETE);
-                result = TransactionManager.Run(this.clauses);
+                this.clauses.AddSoftDeleteClause();
+            } else
+            {
+                this.clauses.AddDeleteClause();
             }
-            catch (Exception ex)
+
+            return this.RunQuery(Transactions.Type.TYPE_DELETE);
+        }
+
+        /// <summary>
+        /// Force deletes the model from the database.
+        /// </summary>
+        /// <returns></returns>
+        public IModel ForceDelete()
+        {
+            this.clauses.AddDeleteClause();
+
+            QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_DELETE);
+
+            if (result.Status != SaveStatus.Error)
             {
-                System.Console.WriteLine(ex.Message);
+                return result.Data as IModel;
+            }
+
+            throw new Exception(result.Message);
+        }
+
+        /// <summary>
+        /// Restores the model from the database.
+        /// </summary>
+        /// <returns></returns>
+        public IModel Restore()
+        {
+            if (this is IUseTimestamps && this.Attributes.IsTrashed())
+            {
+                this.clauses.AddRestoreClause();
+            }
+
+            QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_UPDATE);
+
+            if (result.Status != SaveStatus.Error)
+            {
+                return result.Data as IModel;
+            }
+
+            throw new Exception(result.Message);
+        }
+
+        private QueryResult<SaveStatus> RunQuery(Transactions.Type type)
+        {
+            this.CompileAttributesToClause(type);
+
+            var result = TransactionManager.Save(this.clauses);
+            this.clauses.ClearClauses();
+
+            if (this is IEvent)
+            {
+                this.HandleDispatchEvent(type);
             }
 
             return result;
         }
 
+        private void HandleDispatchEvent(Transactions.Type transactionType)
+        {
+            string eventToDispatch = transactionType switch
+            {
+                Transactions.Type.TYPE_INSERT => "created",
+                Transactions.Type.TYPE_UPDATE => "updated",
+                Transactions.Type.TYPE_DELETE => "deleted",
+            };
+
+            Eloquent eloquent = this;
+            IModel model = null;
+
+            if (this is IUseTimestamps && eventToDispatch == "deleted")
+            {
+                eloquent = this.WithTrashed();
+            }
+
+            switch (transactionType)
+            {
+                case Transactions.Type.TYPE_INSERT:
+                    model = eloquent.OrderBy("id", "desc").First<IModel>();
+                    break;
+                case Transactions.Type.TYPE_UPDATE:
+                case Transactions.Type.TYPE_DELETE:
+                    model = eloquent.Find<IModel>(eloquent.Attributes.GetValue(eloquent.Attributes.PrimaryKey));
+                    break;
+            }
+
+            this.DispatchEvent(eventToDispatch, model);
+            this.DispatchEvent("saved", model);
+        }
+
+        /// <summary>
+        /// Compiles the attributes to a clause.
+        /// </summary>
+        /// <param name="operation"></param>
         private void CompileAttributesToClause(Transactions.Type operation)
         {
             bool modelExists = this.Attributes.HasPrimaryKey();
             if (this is IUseTimestamps)
             {
                 this.Attributes.HandleTimestamps(operation, modelExists);
+            }
+
+            if (this is IEvent)
+            {
+                string eventOperation = operation switch
+                {
+                    Transactions.Type.TYPE_INSERT => "creating",
+                    Transactions.Type.TYPE_UPDATE => "updating",
+                    Transactions.Type.TYPE_DELETE => "deleting",
+                };
+
+                this.DispatchEvent(eventOperation);
+                this.DispatchEvent("saving");
             }
 
             foreach (var item in Attributes.GetChanges())
@@ -389,66 +524,94 @@ namespace Database
                         }
                         break;
                 }
-                //if (this is IUseTimestamps)
-                //{
-                //    HandleTimestamps(item, operation, modelExists);
-                //}
-                //else
-                //{
-                    //if (modelExists)
-                    //{
-                    //    this.clauses.AddUpdateClause(item.Key, item.Value);
-                    //}
-                    //else
-                    //{
-                    //    this.clauses.AddInsertClause(item.Key, item.Value);
-                    //}
-                //}
             }
         }
 
-        //private void HandleTimestamps(KeyValuePair<string, string> item, Transactions.Type operation, bool modelExists)
-        //{
-        //    if (operation == Transactions.Type.TYPE_INSERT || operation == Transactions.Type.TYPE_UPDATE)
-        //    {
-        //        if (modelExists)
-        //        {
-        //            this.clauses.AddUpdateClause(item.Key, item.Value);
-        //        } else
-        //        {
-        //            this.clauses.AddInsertClause(item.Key, item.Value);
-        //        }
-        //    }
-        //    else if (operation == Transactions.Type.TYPE_DELETE)
-        //    {
-        //        this.clauses.AddUpdateClause(item.Key, item.Value);
-        //    }
-        //}
+        private void CompileManyToClause(ParamBag[] bags, Transactions.Type operation)
+        {
+            List<IDictionary<string, string>> keyValues = new();
+
+            foreach (var bag in bags)
+            {
+                IDictionary<string, string> keyValue = new Dictionary<string, string>();
+                foreach (var item in bag.GetParameters())
+                {
+                    keyValue[item.Item1] = item.Item2;
+                }
+                keyValues.Add(keyValue);
+            }
+
+            this.clauses.AddInsertManyClause(keyValues);
+        }
 
         /// <summary>
-        /// Saves the model to the database.
+        /// Creates a new model in the database.
         /// </summary>
-        /// <typeparam name="T">The type of the model.</typeparam>
-        /// <returns>The result of the save operation.</returns>
-        public QueryResult<SaveStatus> Save<T>() where T : IModel
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        public IModel Create<T>() where T : IModel
         {
-            string primaryKey = null;
-            Transactions.Type type = Transactions.Type.TYPE_INSERT;
-            if (this.Attributes.HasPrimaryKey())
+            QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_INSERT);
+
+            if (result.Status != SaveStatus.Error)
             {
-                primaryKey = this.Attributes.GetValue(this.Attributes.PrimaryKey);
-                type = Transactions.Type.TYPE_UPDATE;
+                IModel? model = GetModel<T>();
+
+                return model;
             }
-            
-            this.CompileAttributesToClause(type);
 
-            QueryResult<SaveStatus> result = TransactionManager.Run(this.clauses);
+            throw new Exception(result.Message);
+        }
 
-            IModel model = GetModel<T>(primaryKey);
+        /// <summary>
+        /// Updates the model in the database.
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <returns></returns>
+        /// <exception cref="Exception"></exception>
+        public IModel Update<T>() where T : IModel
+        {
+            if (!this.Attributes.HasPrimaryKey())
+            {
+                throw new Exception("Primary key not set.");
+            }
 
-            result.SetData(model);
+            QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_UPDATE);
 
-            return result;
+            if (result.Status != SaveStatus.Error)
+            {
+                IModel? model = GetModel<T>();
+
+                return model;
+            }
+
+            throw new Exception(result.Message);
+        }
+
+        public List<IModel> CreateMany<T>(ParamBag[] bags) where T : IModel
+        {
+            this.CompileManyToClause(bags, Transactions.Type.TYPE_INSERT);
+
+            var result = TransactionManager.Save(this.clauses);
+
+            if (result.Status != SaveStatus.Error)
+            {
+                List<IModel> models = this.OrderBy("id", "desc").Limit(bags.Length).Get<T>();
+
+                if (this is IEvent)
+                {
+                    foreach (var model in models)
+                    {
+                        this.DispatchEvent("created", model);
+                        this.DispatchEvent("saved", model);
+                        this.DispatchEvent("retrieved", model);
+                    }
+                }
+
+                return models;
+            }
+
+            throw new Exception(result.Message);
         }
 
         /// <summary>
@@ -476,9 +639,13 @@ namespace Database
         /// <returns>The first model.</returns>
         public IModel? First<T>() where T : IModel
         {
+            this.clauses.SetLimit(1);
             return this.Get<T>().FirstOrDefault();
         }
 
+        /// <summary>
+        /// Handles precautions making sure the query is valid and executable
+        /// </summary>
         private void HandlePrecautions()
         {
             if (this.Attributes.TimestampsEnabled() &&
@@ -487,8 +654,18 @@ namespace Database
             {
                 this.WhereNull(TimestampManager.SOFT_DELETE_COLUMN);
             }
+
+            if (this.clauses.QueryType is null)
+            {
+                this.clauses.AddSelectColumn("*");
+            }
         }
 
+        /// <summary>
+        /// Adds an order to the query.
+        /// </summary>
+        /// <param name="column"></param>
+        /// <param name="order"></param>
         private void AddOrder(string column, string order)
         {
             this.clauses.AddOrderBy(column, order);
@@ -510,7 +687,41 @@ namespace Database
         public bool CanBeSoftDeleted()
         {
             return this is IUseTimestamps && this.Attributes.CanBeSoftDeleted() && 
-                this.Attributes.GetValue(TimestampManager.SOFT_DELETE_COLUMN) is not null && !this.Attributes.IsTrashed();
+                this.Attributes.GetValue(TimestampManager.DELETED_AT) is null;
+        }
+
+        private void DispatchEvent(string eventToDispatch)
+        {
+            Events.Dispatcher dispatcher = InstanceContainer.Instance.EventDispatcher();
+
+            IModel model = this as IModel;
+            eventToDispatch = dispatcher.GenerateEventName(this.GetTable(), eventToDispatch);
+
+            dispatcher.Dispatch(eventToDispatch, model);
+        }
+
+        private void DispatchEvent(string eventToDispatch, IModel model)
+        {
+            Events.Dispatcher dispatcher = InstanceContainer.Instance.EventDispatcher();
+            eventToDispatch = dispatcher.GenerateEventName(this.GetTable(), eventToDispatch);
+            dispatcher.Dispatch(eventToDispatch, model);
+        }
+
+        private void RegisterEvents()
+        {
+            if (this is IEvent)
+            {
+                var eventMethods = typeof(IEvent).GetMethods();
+                foreach (var method in eventMethods)
+                {
+                    Events.Dispatcher dispatcher = InstanceContainer.Instance.EventDispatcher();
+                    string eventName = dispatcher.GenerateEventName(this.GetTable(), method.Name);
+
+                    Action<IModel> action = (Action<IModel>)Delegate.CreateDelegate(typeof(Action<IModel>), this, method);
+                    
+                    InstanceContainer.Instance.EventDispatcher().AddListener(eventName, action);
+                }
+            }
         }
     }
 }

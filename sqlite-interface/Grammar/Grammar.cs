@@ -24,7 +24,7 @@ namespace Database.Grammar
             {
                 if (!string.IsNullOrEmpty(attr.Value) && !attr.Key.Equals("id"))
                 {
-                    columns.Append(attr.Key).Append(',');
+                    columns.Append($"`{attr.Key}`,");
 
                     if (rawAttributes.Contains(attr.Key))
                     {
@@ -63,7 +63,7 @@ namespace Database.Grammar
 
             foreach (KeyValuePair<string, string> pair in attributes)
             {
-                statement.Append(pair.Key + " = '" + pair.Value + "',");
+                statement.Append($"`{pair.Key}` = '{pair.Value}',");
             }
 
             if (statement.ToString().EndsWith(","))
@@ -83,11 +83,11 @@ namespace Database.Grammar
 
         protected string CompileDelete(string table, IDictionary<string, string> attributes)
         {
-            StringBuilder statement = new("delete from " + table + " where ");
+            StringBuilder statement = new($"delete from {table} where ");
 
             foreach (KeyValuePair<string, string> d in attributes)
             {
-                statement.Append(d.Key + " = '" + d.Value + "' and ");
+                statement.Append($"`{d.Key}` = {d.Value} and ");
             }
 
             if (statement.ToString().EndsWith(" and "))
@@ -118,7 +118,7 @@ namespace Database.Grammar
 
         protected string CompileColumn(string column, string definitions)
         {
-            return column + " " + definitions;
+            return $"`{column}` {definitions}";
         }
 
         protected string CompileForeignKey(string foreign, string table)
@@ -128,12 +128,12 @@ namespace Database.Grammar
 
         protected string CompileIndex(string column, string table)
         {
-            return "create index if not exists idx_" + column + "_" + table + " on " + table + "(" + column + ")" + CompileEndOfString();
+            return $"create index if not exists idx_{column}_{table} on {table} (`{column}`)" + CompileEndOfString();
         }
 
         protected string CompileDropTable(string table)
         {
-            return "PRAGMA foreign_keys = OFF; drop table if exists " + table +  "; PRAGMA foreign_keys = ON" + CompileEndOfString();
+            return $"PRAGMA foreign_keys = OFF; drop table if exists {table}; PRAGMA foreign_keys = ON" + CompileEndOfString();
         }
 
         private string CompileDropElements(string elementType, List<string> elements)
@@ -160,7 +160,8 @@ namespace Database.Grammar
 
             for (int i = 0; i < columns.Count; i++)
             {
-                query.Append(columns[i]);
+                query.Append($"`{columns[i]}`");
+
                 if (i < columns.Count - 1)
                 {
                     query.Append(", ");
@@ -178,7 +179,8 @@ namespace Database.Grammar
 
             for (int i = 0; i < columns.Count; i++)
             {
-                query.Append(columns[i]);
+                query.Append($"`{columns[i]}`");
+
                 if (i < columns.Count - 1)
                 {
                     query.Append(", ");
@@ -202,6 +204,7 @@ namespace Database.Grammar
             for (int i = 0; i < foreignKeys.Count; i++)
             {
                 query.Append(foreignKeys[i]);
+
                 if (i < foreignKeys.Count - 1)
                 {
                     query.Append(", ");

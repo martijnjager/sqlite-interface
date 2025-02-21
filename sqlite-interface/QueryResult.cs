@@ -1,25 +1,56 @@
-﻿using System.Data.SQLite;
+﻿using Database.Contracts;
+using Database.Extensions.Model;
+using System.Data.Common;
+using System.Data.SQLite;
+using System.Text.Json.Serialization;
 
 namespace Database
 {
     public sealed class QueryResult<SaveStatus>
     {
-        public SaveStatus Status { get; private set; }
+        [JsonPropertyName("status")]
+        public SaveStatus Status { get; private set; } = default!;
 
-        public object Data { get; private set; }
+        [JsonPropertyName("data")]
+        public object Data { get; private set; } = default!;
 
-        public string Message { get; private set; }
+        [JsonPropertyName("message")]
+        public string Message { get; private set; } = string.Empty;
 
-        public SQLiteDataReader? Reader { get; private set; }
+        [JsonIgnore]
+        public DbDataReader? Reader { get; private set; }
 
         public QueryResult() { }
 
-        public void SetStatus(SaveStatus status) { Status = status; }
+        public QueryResult<SaveStatus> SetStatus(SaveStatus status) { Status = status; return this; }
 
-        public void SetData(object data) { Data = data; }
+        public QueryResult<SaveStatus> SetData(object data)
+        {
+            if (data is IModel model)
+            {
+                Data = model.ToExpando();
+            }
 
-        public void SetMessage(string message) { Message = message; }
+            return this; 
+        }
 
-        public void SetReader(SQLiteDataReader? reader) { Reader = reader; }
+        public QueryResult<SaveStatus> SetMessage(string message) { Message = message; return this; }
+
+        public QueryResult<SaveStatus> SetReader(DbDataReader? reader) { Reader = reader; return this; }
+
+        public static QueryResult<SaveStatus> Create(object data, SaveStatus status, string message = "")
+        {
+            if (data is IModel model)
+            {
+                data = model.ToExpando();
+            }
+
+            return new QueryResult<SaveStatus>
+            {
+                Status = status,
+                Data = data,
+                Message = message
+            };
+        }
     }
 }

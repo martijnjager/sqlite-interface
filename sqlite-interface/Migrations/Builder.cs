@@ -45,33 +45,33 @@ namespace Database.Migrations
             if (droppable.Count == 1 && blueprint.GetTable() is null)
             {
                 query.Append(GrammarCompiler.CompileDropTableStatement(droppable[DropType.TABLE][0]));
-            } else
+                return;
+            }
+            
+            string table = blueprint.GetTable() ?? throw new Exception("Table name cannot be missing for dropping columns");
+            foreach (string key in droppable.Keys)
             {
-                string table = blueprint.GetTable() ?? throw new Exception("Table name cannot be missing for dropping columns");
-                foreach (string key in droppable.Keys)
+                switch (key)
                 {
-                    switch (key)
-                    {
-                        case DropType.INDEX:
-                            query.Append(GrammarCompiler.CompileDropIndexesStatement(droppable[DropType.INDEX]));
-                            break;
-                        case DropType.TRIGGER:
-                            query.Append(GrammarCompiler.CompileDropTriggersStatement(droppable[DropType.TRIGGER]));
-                            break;
-                        case DropType.VIEW:
-                            query.Append(GrammarCompiler.CompileDropViewsStatement(droppable[DropType.VIEW]));
-                            break;
-                        case DropType.TABLE:
-                            query.Append(GrammarCompiler.CompileDropTableStatement(droppable[DropType.TABLE][0]));
-                            break;
-                        case DropType.COLUMN:
-                            query.Append(GrammarCompiler.CompileDropColumnsStatement(table, droppable[DropType.COLUMN]));
-                            break;
-                        case DropType.FOREIGN_KEY:
-                            query.Append(GrammarCompiler.CompileDropForeignKeysStatement(table, droppable[DropType.COLUMN]));
-                            break;
+                    case DropType.INDEX:
+                        query.Append(GrammarCompiler.CompileDropIndexesStatement(droppable[DropType.INDEX]));
+                        break;
+                    case DropType.TRIGGER:
+                        query.Append(GrammarCompiler.CompileDropTriggersStatement(droppable[DropType.TRIGGER]));
+                        break;
+                    case DropType.VIEW:
+                        query.Append(GrammarCompiler.CompileDropViewsStatement(droppable[DropType.VIEW]));
+                        break;
+                    case DropType.TABLE:
+                        query.Append(GrammarCompiler.CompileDropTableStatement(droppable[DropType.TABLE][0]));
+                        break;
+                    case DropType.COLUMN:
+                        query.Append(GrammarCompiler.CompileDropColumnsStatement(table, droppable[DropType.COLUMN]));
+                        break;
+                    case DropType.FOREIGN_KEY:
+                        query.Append(GrammarCompiler.CompileDropForeignKeysStatement(table, droppable[DropType.COLUMN]));
+                        break;
 
-                    }
                 }
             }
         }
@@ -112,7 +112,7 @@ namespace Database.Migrations
 
         private static void AddTableNameIntoQuery(BlueprintBase blueprint, StringBuilder query, bool alterQuery = false)
         {
-            string table = blueprint.GetDefinitions()[0].Key;
+            string table = blueprint.GetTable();
 
             if (alterQuery)
             {
@@ -121,7 +121,6 @@ namespace Database.Migrations
             {
                 query.Append(GrammarCompiler.CompileCreateTableStatement(table));
             }
-            blueprint.GetDefinitions().RemoveAt(0);
         }
     }
 }

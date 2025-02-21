@@ -39,7 +39,7 @@ namespace Database.Clauses
             return "DELETE";
         }
 
-        public void Bind(SQLiteCommand connection)
+        public new void Bind(SQLiteCommand connection)
         {
             // Nothing to do here
         }

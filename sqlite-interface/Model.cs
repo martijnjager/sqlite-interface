@@ -6,6 +6,7 @@ using Database.Relations;
 using Database.Extensions.Model;
 using System.Collections.ObjectModel;
 using System.Data.Common;
+using Database.Contracts.Event;
 
 namespace Database
 {
@@ -63,6 +64,10 @@ namespace Database
             base.Attributes.Assign(data);
         }
 
+        /// <summary>
+        /// Adds casts to the model.
+        /// </summary>
+        /// <param name="casts"></param>
         public void AddCasts(List<Tuple<string, System.Type>> casts)
         {
             this.Attributes.AddCasts(casts);
@@ -105,10 +110,22 @@ namespace Database
             }
 
             this.Where(this.Attributes.PrimaryKey, this.Attributes.GetValue(this.Attributes.PrimaryKey));
+
             return base.Delete();
         }
 
-        public QueryResult<SaveStatus> Update<T>() where T : IModel
+        public new IModel Restore()
+        {
+            if (!this.Attributes.HasPrimaryKey())
+            {
+                throw new Exception("Primary key not set.");
+            }
+
+            this.Where(this.Attributes.PrimaryKey, this.Attributes.GetValue(this.Attributes.PrimaryKey));
+            return base.Restore();
+        }
+
+        public new IModel Update<T>() where T : IModel
         {
             if (!this.Attributes.HasPrimaryKey())
             {
@@ -117,7 +134,26 @@ namespace Database
 
             this.Where(this.Attributes.PrimaryKey, this.Attributes.GetValue(this.Attributes.PrimaryKey));
 
-            return base.Save<T>();
+            return base.Update<T>();
+        }
+
+        public new IModel Create<T>() where T : IModel
+        {
+            if (this.Attributes.HasPrimaryKey())
+            {
+                return this.Update<T>();
+            }
+
+            this.Where(this.Attributes.PrimaryKey, this.Attributes.GetValue(this.Attributes.PrimaryKey));
+
+            return base.Create<T>();
+        }
+
+        public static List<IModel> CreateMany<T>(ParamBag[] bags) where T : IModel
+        {
+            IModel model = InstanceContainer.ModelByKey(typeof(T).Name);
+
+            return model.CreateMany<T>(bags);
         }
 
         /// <summary>
@@ -129,11 +165,34 @@ namespace Database
             return this.Attributes.IsTrashed();
         }
 
+        /// <summary>
+        /// Sets the relations to eager load
+        /// </summary>
+        /// <param name="relations"></param>
+        /// <returns></returns>
         public Eloquent With(string relations)
         {
-            this.Relations.LoadEager(this.BuildRelationTree(relations));
+            if (string.IsNullOrEmpty(relations))
+            {
+                return this;
+            }
+
+            var relationsToLoad = this.BuildRelationTree(relations);
+
+            this.Relations.LoadEager(relationsToLoad);
+            this.clauses.SetRelationsToLoad(relationsToLoad);
 
             return this;
+        }
+
+        public string PrimaryKey()
+        {
+            return this.Attributes.PrimaryKey;
+        }
+
+        public void Set(string attribute, dynamic value)
+        {
+            this.Attributes.Set(attribute, value);
         }
     }
 }

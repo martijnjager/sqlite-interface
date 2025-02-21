@@ -1,9 +1,4 @@
 ﻿using Database.Contracts.Attribute;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 
 namespace Database.Attribute
 {
@@ -27,9 +22,11 @@ namespace Database.Attribute
 
         public const string SOFT_DELETE_COLUMN = "deleted_at";
 
-        private string? deletedAt { get; set; }
-        private string? createdAt { get; set; }
-        private string? updatedAt;
+        private string? DeletedAt { get; set; } = null;
+        private string? CreatedAt { get; set; }
+        private string? UpdatedAt;
+
+        private List<string> changed;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TimestampManager"/> class.
@@ -37,6 +34,12 @@ namespace Database.Attribute
         public TimestampManager()
         {
             this.timestamps = false;
+            this.changed = new List<string>();
+        }
+
+        public static string[] TimestampColumns()
+        {
+            return new string[] { CREATED_AT, UPDATED_AT, DELETED_AT };
         }
 
         /// <summary>
@@ -64,7 +67,7 @@ namespace Database.Attribute
         {
             if (this.timestamps && this.softDeletes)
             {
-                this.deletedAt = DateTime.Now.ToString(DATE_FORMAT);
+                this.DeletedAt = DateTime.Now.ToString(DATE_FORMAT);
             }
         }
 
@@ -72,7 +75,7 @@ namespace Database.Attribute
         /// Checks if the model is trashed.
         /// </summary>
         /// <returns>True if the model is trashed; otherwise, false.</returns>
-        public bool IsTrashed() => this.deletedAt != null;
+        public bool IsTrashed() => this.DeletedAt != null;
 
         /// <summary>
         /// Handles the timestamps based on the transaction type and model existence.
@@ -96,18 +99,55 @@ namespace Database.Attribute
         {
             if (this.TimestampsEnabled() && !modelExists && transactionType == Transactions.Type.TYPE_INSERT)
             {
-                this.createdAt = DateTime.Now.ToString(DATE_FORMAT);
+                this.CreatedAt = DateTime.Now.ToString(DATE_FORMAT);
+                this.changed.Add(CREATED_AT);
             }
             else if (this.TimestampsEnabled() && modelExists && transactionType == Transactions.Type.TYPE_UPDATE)
             {
-                this.updatedAt = DateTime.Now.ToString(DATE_FORMAT);
+                this.UpdatedAt = DateTime.Now.ToString(DATE_FORMAT);
+                this.changed.Add(UPDATED_AT);
             }
 
             if (transactionType == Transactions.Type.TYPE_DELETE)
             {
                 this.SetDeletedAt();
+                this.changed.Add(DELETED_AT);
             }
         }
+
+        //public void SetTimestamps(IDictionary<string, string> keys, bool isLoaded)
+        //{
+        //    foreach (KeyValuePair<string, string> key in keys)
+        //    {
+        //        this.SetTimestamp(key.Value, key.Key, isLoaded);
+        //    }
+        //}
+
+        //public void SetTimestamp(string value, string key, bool isLoaded)
+        //{
+        //    switch (key)
+        //    {
+        //        case CREATED_AT:
+        //            this.CreatedAt = value;
+        //            break;
+        //        case UPDATED_AT:
+        //            this.UpdatedAt = value;
+        //            break;
+        //        case DELETED_AT:
+        //            this.DeletedAt = value;
+        //            this.softDeletes = true;
+        //            break;
+        //    }
+
+        //    if (this.DeletedAt != null)
+        //    {
+        //        this.EnableTimestamps(true);
+        //    }
+        //    else
+        //    {
+        //        this.EnableTimestamps(false);
+        //    }
+        //}
 
         /// <summary>
         /// Gets the timestamps as key-value pairs.
@@ -115,12 +155,23 @@ namespace Database.Attribute
         /// <returns>The timestamps as key-value pairs.</returns>
         public IEnumerable<KeyValuePair<string, string>> GetTimestamps()
         {
-            IEnumerable<KeyValuePair<string, string>> timestamps = new List<KeyValuePair<string, string>>()
+            List<KeyValuePair<string, string?>> timestamps = new List<KeyValuePair<string, string?>>();
+
+            foreach (string key in this.changed)
+            {
+                switch (key)
                 {
-                    new(key: CREATED_AT, value: createdAt),
-                    new(key: UPDATED_AT, value: updatedAt),
-                    new(key: DELETED_AT, value: deletedAt)
-                };
+                    case CREATED_AT:
+                        timestamps.Add(new KeyValuePair<string, string?>(CREATED_AT, CreatedAt));
+                        break;
+                    case UPDATED_AT:
+                        timestamps.Add(new KeyValuePair<string, string?>(UPDATED_AT, UpdatedAt));
+                        break;
+                    case DELETED_AT:
+                        timestamps.Add(new KeyValuePair<string, string?>(DELETED_AT, DeletedAt));
+                        break;
+                }
+            }
 
             return timestamps;
         }

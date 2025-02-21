@@ -13,23 +13,23 @@ namespace Database.Clauses
     {
         public void AddInsertClause(string key, string value)
         {
-            Add(new KeyValuePair<string, string>(key, value));
+            Add(new Base(key, value));
         }
 
         protected override void Add<T>(T condition)
         {
-            if (condition is KeyValuePair<string, string> insert)
+            if (condition is Base insert)
             {
                 int count = this.Parameters.Count;
                 this.Parameters.Add($"@insert{count}", insert.Value);
 
-                AddCondition(new KeyValuePair<string, string>(insert.Key, $"@insert{count}"));
+                AddCondition(new Base(insert.Column, $"@insert{count}"));
             }
         }
 
         public override string Compile()
         {
-            KeyValuePair<string, string>[] inserts = this.GetConditions<KeyValuePair<string, string>>();
+            Base[] inserts = this.GetConditions<Base>();
 
             StringBuilder query = new(" (");
 
@@ -44,7 +44,7 @@ namespace Database.Clauses
             return query.ToString();
         }
 
-        protected void CompileColumns(StringBuilder query, KeyValuePair<string, string>[] inserts)
+        protected void CompileColumns(StringBuilder query, Base[] inserts)
         {
             for (int i = 0; i < inserts.Length; i++)
             {
@@ -53,11 +53,11 @@ namespace Database.Clauses
                     query.Append(", ");
                 }
 
-                query.Append(inserts[i].Key);
+                query.Append(inserts[i].Column);
             }
         }
 
-        protected void CompileValues(StringBuilder query, KeyValuePair<string, string>[] inserts)
+        protected void CompileValues(StringBuilder query, Base[] inserts)
         {
             for (int i = 0; i < inserts.Length; i++)
             {
@@ -67,28 +67,6 @@ namespace Database.Clauses
                 }
 
                 query.Append(inserts[i].Value);
-            }
-        }
-
-        public void Bind(SQLiteCommand command)
-        {
-            KeyValuePair<string, string>[] inserts = this.GetConditions<KeyValuePair<string, string>>();
-
-            for (int i = 0; i < inserts.Length; i++)
-            {
-                var parameter = command.CreateParameter();
-
-                parameter.ParameterName = $"@insert{i}";
-                this.Parameters.TryGetValue($"@insert{i}", out string? value);
-
-                if (value is null || value.Equals("null"))
-                {
-                    parameter.Value = DBNull.Value;
-                }
-                else
-                {
-                    parameter.Value = value;
-                }
             }
         }
     }

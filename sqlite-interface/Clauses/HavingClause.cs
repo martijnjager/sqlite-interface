@@ -2,6 +2,7 @@
 using Database.Contracts.Clause;
 using System;
 using System.Collections.Generic;
+using System.Configuration;
 using System.Data.SQLite;
 using System.Linq;
 using System.Text;
@@ -11,23 +12,7 @@ namespace Database.Clauses
 {
     public class HavingClause : BaseClause, IHavingClause
     {
-        protected struct Having
-        {
-            public Having() 
-            {
-                Column = string.Empty;
-                Operator = string.Empty;
-                Value = string.Empty;
-                Boolean = string.Empty;
-            }
-
-            public string Column { get; set; }
-            public string Operator { get; set; }
-
-            public string Value { get; set; }
-
-            public string Boolean { get; set; }
-        }
+        protected record Having (string Column, string Operator, string Value, string Boolean) : Base(Column, Value);
 
         protected override void Add<T>(T condition)
         {
@@ -37,34 +22,22 @@ namespace Database.Clauses
 
                 if (!exemptions.Contains(having.Value))
                 {
-                    if (having.Value is null || having.Value.Equals("null"))
+                    if (IsNull(having.Value))
                     {
-                        string valueName = "@having" + (this.Parameters.Count).ToString();
-                        this.Parameters.Add(valueName, "null");
-                        having.Value = valueName;
+                        string newValue = HandleValue(having, "@having", true);
+                        having = having with { Value = newValue };
                     }
                     else
                     {
-                        if (having.Operator.Equals("in"))
+                        if (having.Operator.Equals(Operator.In))
                         {
-                            string[] options = having.Value.Split(',');
-
-                            int offset = this.Parameters.Count - options.Length;
-
-                            having.Value = string.Join(",", options.Select(option => "@having" + (offset++).ToString()));
-
-                            offset = this.Parameters.Count - options.Length;
-
-                            foreach (string option in options)
-                            {
-                                this.Parameters.Add("having" + (offset++).ToString(), option);
-                            }
+                            string newValue = HandleInOperator(having, "@having");
+                            having = having with { Value = newValue };
                         }
                         else
                         {
-                            string valueName = "@having" + (this.Parameters.Count).ToString();
-                            this.Parameters.Add(valueName, having.Value);
-                            having.Value = valueName;
+                            string newValue = HandleValue(having, "@having", true);
+                            having = having with { Value = newValue };
                         }
                     }
                 }
@@ -75,38 +48,38 @@ namespace Database.Clauses
 
         public void AddHavingClause(string key, string op, string value)
         {
-            AddCondition(new Having { Column = key, Operator = op, Value = value, Boolean = "and" });
+            AddCondition(new Having(key, op, value, "and"));
         }
 
         public void AddOrHavingClause(string key, string op, string value)
         {
-            AddCondition(new Having { Column = key, Operator = op, Value = value, Boolean = "or" });
+            AddCondition(new Having(key, op, value, "or"));
         }
 
         public void AddNestedHavingClause(Action<Eloquent> callback, Eloquent model)
         {
-            AddCondition(new Having { Column = "", Operator = "", Value = "(" });
+            AddCondition(new Having("", "", "(", ""));
             callback(model);
-            AddCondition(new Having { Column = "", Operator = "", Value = ")", Boolean = "and" });
+            AddCondition(new Having("", "", ")", ""));
         }
 
         public void AddHasClause(string relation, Action<Eloquent> callback, Eloquent model)
         {
-            AddCondition(new Having { Column = relation, Operator = "exists", Value = "(" });
+            AddCondition(new Having(relation, Operator.Exists, "(", "("));
             callback(model);
-            AddCondition(new Having { Column = "", Operator = "", Value = ")", Boolean = "and" });
+            AddCondition(new Having("", "", ")", ""));
         }
 
         public void AddHasNotClause(string relation, Action<Eloquent> callback, Eloquent model)
         {
-            AddCondition(new Having { Column = relation, Operator = "not exists", Value = "(" });
+            AddCondition(new Having(relation, Operator.NotExists, "(", "("));
             callback(model);
-            AddCondition(new Having { Column = "", Operator = "", Value = ")", Boolean = "and" });
+            AddCondition(new Having("", "", ")", ""));
         }
 
         public void AddHavingInClause(string key, params object[] values)
         {
-            AddCondition(new Having { Column = key, Operator = "in", Value = "(" + string.Join(", ", values) + ")", Boolean = "and" });
+            AddCondition(new Having(key, Operator.In, "(" + string.Join(", ", values) + ")", "and"));
         }
 
         public override string Compile()
@@ -125,29 +98,8 @@ namespace Database.Clauses
                     .Append(havings[i].Operator).Append(' ')
                     .Append($"@having{i}").Append(' ');
             }
+
             return query.ToString();
-        }
-
-        public void Bind(SQLiteCommand command)
-        {
-            Having[] havings = this.GetConditions<Having>();
-
-            for (int i = 0; i < havings.Length; i++)
-            {
-                this.Parameters.TryGetValue($"@having{i}", out string? value);
-
-                var parameter = command.CreateParameter();
-                parameter.ParameterName = $"@having{i}";
-
-                if (value is null || value == "null")
-                {
-                    parameter.Value = DBNull.Value;
-                }
-                else
-                {
-                    parameter.Value = value;
-                }
-            }
         }
     }
 }

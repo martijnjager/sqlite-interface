@@ -11,10 +11,14 @@ namespace Database.Contracts
 
         void Load(string relations);
 
-        QueryResult<SaveStatus> Save<T>() where T : IModel;
+        IModel Create<T>() where T : IModel;
+
+        IModel Update<T>() where T : IModel;
 
         QueryResult<SaveStatus> Delete();
 
         bool IsTrashed();
+
+        void Set(string attribute, dynamic value);
     }
 }

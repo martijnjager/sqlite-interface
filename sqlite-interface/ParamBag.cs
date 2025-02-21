@@ -121,5 +121,20 @@ namespace Database
 
             return true;
         }
+
+        public IDictionary<string, string> GetByKeys(string[] keys)
+        {
+            IDictionary<string, string> foundKeys = new Dictionary<string, string>();
+
+            foreach (string key in keys)
+            {
+                if (this.HasKey(key))
+                {
+                    foundKeys.Add(key, this.GetValue(key));
+                }
+            }
+
+            return foundKeys;
+        }
     }
 }

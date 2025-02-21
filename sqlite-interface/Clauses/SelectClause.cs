@@ -12,25 +12,14 @@ namespace Database.Clauses
 {
     public class SelectClause : BaseClause, ISelectClause
     {
-        protected struct Select
-        {
-            public Select() 
-            {
-                Column = string.Empty;
-                Alias = string.Empty;
-            }
-
-            public string Column { get; set; }
-            public string Alias { get; set; }
-        }
         public void AddColumn(string column, string alias = "")
         {
-            Add(new Select { Column = column, Alias = alias });
+            Add(new Base(column, alias));
         }
 
         protected override void Add<T>(T condition)
         {
-            if (condition is Select select)
+            if (condition is Base select)
             {
                 AddCondition(select);
             }
@@ -40,7 +29,7 @@ namespace Database.Clauses
         {
             StringBuilder query = new("SELECT ");
 
-            Select[] selects = this.GetConditions<Select>();
+            Base[] selects = this.GetConditions<Base>();
 
             if (selects.Length == 0)
             {
@@ -55,16 +44,16 @@ namespace Database.Clauses
                         query.Append(", ");
                     }
                     query.Append(selects[i].Column);
-                    if (selects[i].Alias != "")
+                    if (!string.IsNullOrEmpty(selects[i].Value))
                     {
-                        query.Append(" AS ").Append(selects[i].Alias);
+                        query.Append(" AS ").Append(selects[i].Value);
                     }
                 }
             }
             return query.ToString();
         }
 
-        public void Bind(SQLiteCommand command)
+        public new void Bind(SQLiteCommand command)
         {
             // No binding required
         }

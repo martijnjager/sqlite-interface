@@ -42,12 +42,17 @@ namespace Database.Migrations
             return this;
         }
 
+        public Blueprint Bool(string column)
+        {
+            this._table.Bool(column);
+            return this;
+        }
+
         public Blueprint Timestamps()
         {
             this._table.Timestamps();
             return this;
         }
-
 
         public Blueprint SoftDeletes()
         {

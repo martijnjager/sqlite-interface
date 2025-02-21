@@ -17,6 +17,6 @@ namespace Database.Contracts
         //void AddQuery(ClauseManager clauseManager, List<Join> joins);
 
         //QueryResult<SaveStatus> RunTransactions();
-        List<IModel> Run<T>(ClauseManager clauseManager) where T : IModel;
+        List<IModel> Read<T>(ClauseManager clauseManager) where T : IModel;
     }
 }

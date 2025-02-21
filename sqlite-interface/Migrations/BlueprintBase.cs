@@ -14,6 +14,7 @@ namespace Database.Migrations
         private readonly List<string> indexes;
         private readonly IDictionary<string, List<string>> droppable;
         private bool alterTable;
+        private string table;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="BlueprintBase"/> class.
@@ -34,7 +35,7 @@ namespace Database.Migrations
         /// <returns>The <see cref="BlueprintBase"/> instance.</returns>
         public BlueprintBase PrimaryKey(string? id = null)
         {
-            this.AddItem(id ?? "id", "integer primary key autoincrement");
+            this.AddItem(id ?? "id", "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL");
 
             return this;
         }
@@ -46,7 +47,7 @@ namespace Database.Migrations
         /// <returns>The <see cref="BlueprintBase"/> instance.</returns>
         public BlueprintBase String(string value)
         {
-            this.AddItem(value, "string not null");
+            this.AddItem(value, "STRING NOT NULL");
 
             return this;
         }
@@ -58,7 +59,7 @@ namespace Database.Migrations
         /// <returns>The <see cref="BlueprintBase"/> instance.</returns>
         public BlueprintBase Int(string value)
         {
-            this.AddItem(value, "int not null");
+            this.AddItem(value, "INT NOT NULL");
 
             return this;
         }
@@ -70,8 +71,14 @@ namespace Database.Migrations
         /// <returns>The <see cref="BlueprintBase"/> instance.</returns>
         public BlueprintBase Text(string value)
         {
-            this.AddItem(value, "text not null");
+            this.AddItem(value, "TEXT NOT NULL");
 
+            return this;
+        }
+
+        public BlueprintBase Bool(string value)
+        {
+            this.AddItem(value, "BOOLEAN NOT NULL");
             return this;
         }
 
@@ -83,7 +90,7 @@ namespace Database.Migrations
         /// <returns>The <see cref="BlueprintBase"/> instance.</returns>
         public BlueprintBase Table(string value, bool alterTable = false)
         {
-            this.AddItem(value, null);
+            this.table = value;
             this.alterTable = alterTable;
 
             return this;
@@ -116,7 +123,7 @@ namespace Database.Migrations
             if (!item.Equals(default(KeyValuePair<string, string>)))
             {
                 var sb = new StringBuilder();
-                sb.Append(" references ");
+                sb.Append(" REFERENCES ");
                 sb.Append(table);
                 sb.Append('(');
                 sb.Append(key);
@@ -148,7 +155,7 @@ namespace Database.Migrations
 
             if (!item.Equals(default(KeyValuePair<string, string>)))
             {
-                string definitions = item.Value + " unique";
+                string definitions = item.Value + " UNIQUE";
                 item = new KeyValuePair<string, string>(item.Key, definitions);
 
                 this._items[_items.Count - 1] = item;
@@ -167,7 +174,7 @@ namespace Database.Migrations
 
             if (!item.Equals(default(KeyValuePair<string, string>)))
             {
-                string definitions = item.Value.Replace("not null", "null");
+                string definitions = item.Value.Replace("NOT NULL", "NULL");
                 item = new KeyValuePair<string, string>(item.Key, definitions);
 
                 this._items[_items.Count - 1] = item;
@@ -182,8 +189,8 @@ namespace Database.Migrations
         /// <returns>The <see cref="BlueprintBase"/> instance.</returns>
         public BlueprintBase Timestamps()
         {
-            this.AddItem(TimestampManager.CREATED_AT, "timestamp");
-            this.AddItem(TimestampManager.UPDATED_AT, "timestamp nullable");
+            this.AddItem(TimestampManager.CREATED_AT, "DATETIME NOT NULL");
+            this.AddItem(TimestampManager.UPDATED_AT, "DATETIME NULLABLE");
 
             return this;
         }
@@ -194,7 +201,7 @@ namespace Database.Migrations
         /// <returns>The <see cref="BlueprintBase"/> instance.</returns>
         public BlueprintBase SoftDeletes()
         {
-            this.AddItem(TimestampManager.SOFT_DELETE_COLUMN, "timestamp nullable");
+            this.AddItem(TimestampManager.SOFT_DELETE_COLUMN, "DATETIME NULLABLE");
 
             return this;
         }
@@ -206,7 +213,7 @@ namespace Database.Migrations
         /// <returns>The <see cref="BlueprintBase"/> instance.</returns>
         public BlueprintBase Datetime(string column)
         {
-            this.AddItem(column, "timestamp not null");
+            this.AddItem(column, "DATETIME");
 
             return this;
         }
@@ -307,7 +314,7 @@ namespace Database.Migrations
         /// Gets the name of the table.
         /// </summary>
         /// <returns>The name of the table.</returns>
-        public string? GetTable() => _items.Find((item) => item.Value is null).Key;
+        public string? GetTable() => table;
 
         /// <summary>
         /// Determines whether there are columns to be dropped from the table.

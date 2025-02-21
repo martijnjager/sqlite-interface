@@ -13,10 +13,11 @@ using Database.Collections;
 using System.Dynamic;
 using Database.Extensions;
 using MigrationModel = Database.Models.Migration;
+using Database.Connection;
 
 namespace Database
 {
-    public class Migration : Connection
+    public class Migration : BaseConnection
     {
         private readonly List<IMigration> migrationList;
         private readonly List<ISeeder> seederList;
@@ -69,7 +70,7 @@ namespace Database
             var newBatchIndex = 1;
             try
             {
-                var batchData = models.OrderByDescending(m => m.GetValue("batch")).First();
+                var batchData = models.OrderByDescending(m => m.GetValue("batch")).FirstOrDefault();
 
                 if (batchData is not null)
                 {
@@ -107,7 +108,7 @@ namespace Database
                     .Add("up", query, true)
                     .Add("down", queryDown, true);
                 model.Assign(bag);
-                model.Save<MigrationModel>();
+                model.Create<MigrationModel>();
                 Instance.RunSaveQuery(query);
                 BaseCommand.WriteLine("Finished migration");
                 Instance.Table = new Blueprint();

@@ -7,6 +7,7 @@ using System;
 using Command = Database.Console.BaseCommand;
 using Database.Transactions;
 using System.Reflection;
+using Database.Events;
 
 namespace Database
 {
@@ -18,10 +19,11 @@ namespace Database
             InstanceContainer.RegisterSingleton<GrammarCompiler>();
             InstanceContainer.RegisterSingleton<Command>();
             InstanceContainer.RegisterSingleton<Configuration>();
-            InstanceContainer.RegisterSingleton<Dispatcher>();
             InstanceContainer.RegisterSingleton<Provider>();
             InstanceContainer.RegisterSingleton<Migration>();
             InstanceContainer.RegisterSingleton<TransactionManager>();
+            InstanceContainer.RegisterSingleton<Events.Dispatcher>();
+            InstanceContainer.RegisterSingleton<Dispatcher>();
             //Command.RegisterCommand<Migrate>();
             //Command.RegisterCommand<RevertMigrate>();
             //Command.RegisterCommand<Make>();
@@ -60,14 +62,14 @@ namespace Database
             //Environment.Exit(0);
         }
 
+        internal static Events.Dispatcher EventDispatcher(this InstanceContainer app)
+        {
+            return app.GetInstance<Events.Dispatcher>();
+        }
+
         public static Dispatcher Dispatcher(this InstanceContainer app)
         {
             return app.GetInstance<Dispatcher>();
-        }
-
-        public static void Dispatch<T>(this InstanceContainer app, object ?data = null)
-        {
-            Dispatcher(app).Dispatch<T>(data);
         }
     }
 }

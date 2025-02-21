@@ -189,7 +189,13 @@ namespace Database.Relations
 
         public static void LoadRelations(ToLoad relation, IEnumerable<IModel> models)
         {
-            IModel currentModel = models.First();
+            IModel currentModel = models.FirstOrDefault();
+
+            if (currentModel is null)
+            {
+                return;
+            }
+
             MethodInfo method = currentModel.GetRelationMethod(relation.Key);
 
             if (method?.Invoke(currentModel, null) is not IJoin join)
@@ -240,6 +246,11 @@ namespace Database.Relations
             }
         }
 
+        /// <summary>
+        /// Recursively loads relations
+        /// </summary>
+        /// <param name="relations"></param>
+        /// <param name="models"></param>
         public static void LoadRelations(List<ToLoad> relations, IEnumerable<IModel> models)
         {
             foreach (ToLoad relation in relations)
@@ -248,6 +259,10 @@ namespace Database.Relations
             }
         }
 
+        /// <summary>
+        /// Sets relations to eager load
+        /// </summary>
+        /// <param name="relations"></param>
         public void LoadEager(List<ToLoad> relations)
         {
             this.EagerLoad = relations;

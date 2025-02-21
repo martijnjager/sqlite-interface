@@ -62,9 +62,66 @@ namespace Database
             }
         }
 
+        /// <summary>
+        /// Registers all types in the specified namespace as binded types
+        /// </summary>
+        /// <param name="executingAssembly"></param>
+        /// <param name="namespaceName"></param>
+        public static void RegisterByNamespace(Assembly executingAssembly, string namespaceName)
+        {
+            Type[] typeList = executingAssembly.GetTypes();
+            // Need to fetch all types that are in the Database.Migrations namespace
+            List<Type> migrations = typeList.Where(t => t.FullName.Contains(namespaceName) && !t.Name.Contains('<')).ToList();
+            foreach (Type migration in migrations)
+            {
+                Instance.bindItems.Add(new Tuple<string, Type>(migration.Name, migration));
+            }
+        }
+
+        public static List<object> LoadByNamespace(string classNamespace, List<string> only = null, List<string> except = null)
+        {
+            List<object> instances = new List<object>();
+
+            List<Tuple<string, Type>> classesInNamespace = Instance.bindItems.Where(x => x.Item2.Namespace == classNamespace).ToList();
+
+            if (only is not null)
+            {
+                classesInNamespace = classesInNamespace.Where(x => only.Contains(x.Item1)).ToList();
+            }
+
+            if (except is not null)
+            {
+                classesInNamespace = classesInNamespace.Where(x => !except.Contains(x.Item1)).ToList();
+            }
+
+            if (classesInNamespace.Count < 1)
+            {
+                return instances;
+            }
+
+            foreach (Tuple<string, Type> item in classesInNamespace)
+            {
+                var obj = Instance.GetInstance<object>(item.Item1);
+                instances.Add(obj);
+            }
+
+            return instances;
+        }
+
+        /// <summary>
+        /// Register a singleton object
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <exception cref="Exception"></exception>
         protected void Register<T>()
         {
-            object singleton = Factory.Create<T>();
+            object? singleton = Factory.Create<T>();
+
+            if (singleton is null)
+            {
+                throw new Exception("Object could not be created: " + typeof(T).Name);
+            }
+
             string name = singleton.GetType().Name;
             this.singletonItems.Add(new Tuple<string, object>(name, singleton));
         }
@@ -193,15 +250,17 @@ namespace Database
 
         public static IModel? ModelByKey(string key, ReadOnlyCollection<DbColumn>? columns = null)
         {
+            key = key.ToString().Singular().ToLower().RemoveSpecialCharacters();
+
             foreach (Type t in Instance.models)
             {
-                if (t.Name.ToLower().Equals(key.ToString().Singular().ToLower()))
+                if (t.Name.ToLower().Equals(key))
                 {
                     return Factory.Create(t, columns ?? null) as Model;
                 }
             }
 
-            throw new Exception("Model not found." + key.ToString().Singular());
+            throw new Exception("Model not found." + key);
         }
 
         /// <summary>

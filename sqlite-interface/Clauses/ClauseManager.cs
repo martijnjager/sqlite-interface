@@ -1,9 +1,13 @@
-﻿using Database.Contracts.Clause;
+﻿using Database.Attribute;
+using Database.Contracts.Clause;
+using Database.Relations;
+using Database.Transactions;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
 using System.Data.SQLite;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -31,11 +35,19 @@ namespace Database.Clauses
 
         protected IInsertClause insert;
 
+        protected IInsertManyClause insertMany;
+
         protected int Limit;
 
         protected readonly IDictionary<string, string> parameters;
 
         protected string table;
+
+        public readonly List<string> ExcludeColumns;
+
+        public List<ToLoad> Relations { get; private set; }
+
+        public Transactions.Type? QueryType { get; private set; } = null;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="ClauseManager"/> class.
@@ -53,9 +65,16 @@ namespace Database.Clauses
             delete = new DeleteClause();
             update = new UpdateClause();
             insert = new InsertClause();
+            insertMany = new InsertManyClause();
 
             this.table = table;
             this.Limit = -1;
+            this.ExcludeColumns = new List<string>();
+        }
+
+        public void SetRelationsToLoad(List<ToLoad> relations)
+        {
+            this.Relations = relations;
         }
 
         /// <summary>
@@ -73,6 +92,19 @@ namespace Database.Clauses
             delete.Clear();
             update.Clear();
             insert.Clear();
+            insertMany.Clear();
+            QueryType = null;
+            Relations?.Clear();
+        }
+
+        private void SetType(Transactions.Type type)
+        {
+            //if (this.QueryType is not null && this.QueryType != type)
+            //{
+            //    throw new Exception("Cannot change type of query");
+            //}
+
+            this.QueryType = type;
         }
 
         /// <summary>
@@ -156,7 +188,18 @@ namespace Database.Clauses
         /// <param name="alias">The column alias.</param>
         public void AddSelectColumn(string column, string alias = "")
         {
+            this.SetType(Transactions.Type.TYPE_SELECT);
             selects.AddColumn(column, alias);
+        }
+
+        public void DontSelectColumn(string column)
+        {
+            ExcludeColumns.Add(column);
+        }
+
+        public void RemoveDontSelect(string column)
+        {
+            ExcludeColumns.Remove(column);
         }
 
         /// <summary>
@@ -229,6 +272,7 @@ namespace Database.Clauses
         /// <param name="value">The value.</param>
         public void AddUpdateClause(string key, string value)
         {
+            this.SetType(Transactions.Type.TYPE_UPDATE);
             update.AddUpdateClause(key, value);
         }
 
@@ -237,6 +281,7 @@ namespace Database.Clauses
         /// </summary>
         public void AddDeleteClause()
         {
+            this.SetType(Transactions.Type.TYPE_DELETE);
             delete.AddDeleteClause();
         }
 
@@ -245,7 +290,14 @@ namespace Database.Clauses
         /// </summary>
         public void AddSoftDeleteClause()
         {
+            this.SetType(Transactions.Type.TYPE_DELETE);
             delete.AddSoftDeleteClause();
+        }
+
+        public void AddRestoreClause()
+        {
+            this.SetType(Transactions.Type.TYPE_UPDATE);
+            update.AddUpdateClause(TimestampManager.DELETED_AT, "null");
         }
 
         /// <summary>
@@ -255,7 +307,14 @@ namespace Database.Clauses
         /// <param name="value">The value.</param>
         public void AddInsertClause(string key, string value)
         {
+            this.SetType(Transactions.Type.TYPE_INSERT);
             insert.AddInsertClause(key, value);
+        }
+
+        public void AddInsertManyClause(List<IDictionary<string, string>> keyValues)
+        {
+            this.SetType(Transactions.Type.TYPE_INSERT);
+            insertMany.AddInsertManyClause(keyValues);
         }
 
         /// <summary>
@@ -294,24 +353,30 @@ namespace Database.Clauses
                 query = CompileDeleteQuery(query);
             }
 
-            if (insert.HasConditions())
+            if (insert.HasConditions() || insertMany.HasConditions())
             {
                 query = CompileInsertQuery(query);
             }
 
-            if (!update.HasConditions() && !delete.HasConditions() && !insert.HasConditions())
+            if (!update.HasConditions() && !delete.HasConditions() &&
+                !insert.HasConditions() && !insertMany.HasConditions())
             {
                 query = CompileSelectQuery(query);
             }
 
             var conn = InstanceContainer.Instance.ConnectionManager().GetConnection().SqliteConnection();
+            if (conn.State != System.Data.ConnectionState.Open)
+            {
+                conn.Open();
+            }
+            var transaction = conn.BeginTransaction();
 
             SQLiteCommand command = conn.CreateCommand();
             command.CommandText = query.ToString();
             command.CommandType = System.Data.CommandType.Text;
             this.Bind(command);
 
-            return new Transactions.Transaction(command);
+            return new Transactions.Transaction(conn, command, transaction);
         }
 
         protected SQLiteCommand Bind(SQLiteCommand command)
@@ -331,6 +396,11 @@ namespace Database.Clauses
                 insert.Bind(command);
             }
 
+            if (insertMany.HasConditions())
+            {
+                insertMany.Bind(command);
+            }
+
             if (update.HasConditions())
             {
                 update.Bind(command);
@@ -347,7 +417,14 @@ namespace Database.Clauses
         private StringBuilder CompileInsertQuery(StringBuilder query)
         {
             query.Append("INSERT INTO ").Append(table);
-            query.Append(insert.Compile());
+
+            if (insert.HasConditions())
+            {
+                query.Append(insert.Compile());
+            } else if (insertMany.HasConditions())
+            {
+                query.Append(insertMany.Compile());
+            }
             query.Append(';');
 
             return query;

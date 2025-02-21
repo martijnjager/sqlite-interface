@@ -17,7 +17,7 @@ namespace Database.Extensions.Model
             
             foreach (string relation in relations.Split(','))
             {
-                string[] keys = relation.Split('.');
+                string[] keys = relation.Replace(" ", string.Empty).Split('.');
                 ToLoad current = relationsToLoad.FirstOrDefault((r) => r.Key == keys[0]);
 
                 if (current.Key is null)

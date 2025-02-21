@@ -1,4 +1,5 @@
 ﻿using Database.Contracts.Attribute;
+using System.CodeDom;
 using System.Collections.ObjectModel;
 using System.Data.Common;
 
@@ -64,9 +65,9 @@ namespace Database.Attribute
             {
                 string value = attributeValue;
 
-                if (casts != null && !string.IsNullOrEmpty(value))
+                if (Casts != null && !string.IsNullOrEmpty(value))
                 {
-                    foreach (Tuple<string, System.Type> cast in casts)
+                    foreach (Tuple<string, System.Type> cast in Casts)
                     {
                         if (cast.Item1 == column)
                         {
@@ -91,6 +92,19 @@ namespace Database.Attribute
                 if (shouldAssign)
                 {
                     this.Attributes[parameter.Item1] = parameter.Item2;
+
+                    if (parameter.Item2 is not null)
+                    {
+                        Type valueType = parameter.Item2.GetType();
+
+                        if (valueType != typeof(string))
+                        {
+                            this.AddCasts(new List<Tuple<string, System.Type>> {
+                                new(parameter.Item1, valueType)
+                            });
+                        }
+                    }
+
                     System.Type type = this.GetType();
                     type.GetProperty(parameter.Item1)?.SetValue(this, parameter.Item2);
 
@@ -101,10 +115,28 @@ namespace Database.Attribute
                 }
             }
 
+            //string[] timestampColumns = TimestampColumns();
+
+            //if (data.HasAnyKey(timestampColumns))
+            //{
+            //    this.SetTimestamps(data.GetByKeys(timestampColumns), this.isLoaded);
+            //}
+
             if (!this.isLoaded)
             {
                 this.SyncOriginal();
             }
+        }
+        
+        public void Set(string attribute, dynamic value)
+        {
+            this.Attributes[attribute] = value.ToString();
+        }
+
+        public void ResyncOriginal()
+        {
+            this.Original = new Dictionary<string, string>(this.Attributes);
+            this.isLoaded = true;
         }
 
         protected void SyncOriginal()
@@ -143,6 +175,10 @@ namespace Database.Attribute
                 return;
             }
 
+            string[] timestampColumns = TimestampColumns();
+
+            List<Tuple<string, System.Type>> timestampCasts = new();
+
             foreach (var item in columns)
             {
                 string key = item.ColumnName;
@@ -155,10 +191,17 @@ namespace Database.Attribute
                     this.Original.Add(key, null);
                 }
 
-                if (key.Equals(TimestampManager.SOFT_DELETE_COLUMN))
+                if (timestampColumns.Contains(key))
                 {
-                    this.EnableTimestamps();
+                    var timecast = new Tuple<string, System.Type>(key, typeof(DateTime));
+                    timestampCasts.Add(timecast);
                 }
+            }
+
+            if (timestampCasts.Count > 0)
+            {
+                this.EnableTimestamps();
+                this.AddTimestampCasts();
             }
         }
 

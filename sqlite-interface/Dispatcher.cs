@@ -18,6 +18,11 @@ namespace Database
             this.pendingJobs = new List<dynamic>();
         }
 
+        public static void DispatchJob<T>(object? data = null)
+        {
+            InstanceContainer.Instance.Dispatcher().Dispatch<T>(data);
+        }
+
         public void Dispatch<T>(object? data = null)
         {
             ThreadPool.GetAvailableThreads(out _, out int availableAsyncThreads);
@@ -29,8 +34,10 @@ namespace Database
                     var job = Activator.CreateInstance<T>();
                     pendingJobs.Add(job);
                     MethodInfo method = typeof(T).GetMethod("Handle");
-                    method.Invoke(job, new object[] { data });
-                    //ThreadPool.QueueUserWorkItem(job.Handle, data);
+                    ThreadPool.QueueUserWorkItem(_ =>
+                    {
+                        method.Invoke(job, new object[] { data });
+                    });
                 } catch(NotSupportedException)
                 {
                     _ = new DispatchException();

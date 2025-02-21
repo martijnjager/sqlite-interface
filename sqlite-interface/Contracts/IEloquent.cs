@@ -44,5 +44,11 @@ namespace Database.Contracts
         List<IModel> Get<T>() where T : IModel;
 
         IModel? First<T>() where T : IModel;
+
+        IModel? Create<T>() where T : IModel;
+
+        IModel? Update<T>() where T : IModel;
+
+        List<IModel> CreateMany<T>(ParamBag[] bags) where T : IModel;
     }
 }

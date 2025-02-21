@@ -9,8 +9,9 @@ namespace Database.Contracts.Attribute
     public interface ICastManager : ITimestampManager
     {
         void AddTimestampCasts();
+
         void AddCasts(List<Tuple<string, System.Type>> casts);
 
-        List<Tuple<string, System.Type>> casts { get; }
+        List<Tuple<string, System.Type>> Casts { get; }
     }
 }

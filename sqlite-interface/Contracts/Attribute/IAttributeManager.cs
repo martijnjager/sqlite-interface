@@ -79,5 +79,17 @@ namespace Database.Contracts.Attribute
         /// </summary>
         /// <returns></returns>
         IDictionary<string, string> GetChanges();
+
+        /// <summary>
+        /// Resyncs the original attributes.
+        /// </summary>
+        void ResyncOriginal();
+
+        /// <summary>
+        /// Sets the value of the specified attribute.
+        /// </summary>
+        /// <param name="attribute"></param>
+        /// <param name="value"></param>
+        void Set(string attribute, dynamic value);
     }
 }

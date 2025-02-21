@@ -13,16 +13,16 @@ namespace Database.Clauses
     {
         public void AddUpdateClause(string key, string value)
         {
-            this.Add(new KeyValuePair<string, string>(key, value));
+            this.Add(new Base(key, value));
         }
 
         protected override void Add<T>(T condition)
         {
-            if (condition is KeyValuePair<string, string> update)
+            if (condition is Base update)
             {
-                string valueName = "@update" + (this.Parameters.Count).ToString();
+                string valueName = "@update" + (this.Parameters.Count + 1).ToString();
 
-                if (update.Value is null || update.Value.Equals("null"))
+                if (IsNull(update.Value))
                 {
                     this.Parameters.Add(valueName, "null");
                 }
@@ -31,7 +31,7 @@ namespace Database.Clauses
                     this.Parameters.Add(valueName, update.Value);
                 }
 
-                update = new KeyValuePair<string, string>(update.Key, valueName);
+                update = update with { Value = valueName };
 
                 this.AddCondition(update);
             }
@@ -41,7 +41,7 @@ namespace Database.Clauses
         {
             StringBuilder query = new(" SET ");
 
-            KeyValuePair<string, string>[] updates = this.GetConditions<KeyValuePair<string, string>>();
+            Base[] updates = this.GetConditions<Base>();
 
             for (int i = 0; i < updates.Length; i++)
             {
@@ -50,36 +50,12 @@ namespace Database.Clauses
                     query.Append(", ");
                 }
 
-                query.Append(updates[i].Key)
-                    .Append(" = '")
-                    .Append(updates[i].Value)
-                    .Append('\'');
+                query.Append(updates[i].Column)
+                    .Append(" = ")
+                    .Append(updates[i].Value);
             }
 
             return query.ToString();
-        }
-
-        public void Bind(SQLiteCommand command)
-        {
-            KeyValuePair<string, string>[] updates = this.GetConditions<KeyValuePair<string, string>>();
-
-            for (int i = 0; i < updates.Length; i++)
-            {
-                this.Parameters.TryGetValue(updates[i].Value, out string? value);
-                var parameter = command.CreateParameter();
-                parameter.ParameterName = updates[i].Value;
-
-                if (value is null || value == "null")
-                {
-                    parameter.Value = DBNull.Value;
-                }
-                else
-                {
-                    parameter.Value = value;
-                }
-
-                command.Parameters.Add(parameter);
-            }
         }
     }
 }
