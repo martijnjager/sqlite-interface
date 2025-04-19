@@ -12,6 +12,30 @@ namespace Database.Relations
     {
         public RelationType Type { get; set; }
         public List<IModel> Models { get; set; }
+
+        
+        public RelationMetaData Metadata { get; set; }
+    }
+
+    public class RelationMetaData
+    {
+        public DateTime LastUpdated { get; set; }
+
+        public string ParentType { get; set; }
+
+        public string ParentId { get; set; }
+
+        public string RelationName { get; set; }
+
+        public RelationMetaData()
+        {
+            LastUpdated = DateTime.Now;
+        }
+
+        public virtual bool IsValid(TimeSpan? maxAge = null)
+        {
+            return DateTime.Now - LastUpdated < (maxAge ?? TimeSpan.FromMinutes(5));
+        }
     }
 
     public struct ToLoad

@@ -40,10 +40,10 @@ namespace Database.Extensions.Relation
         /// <typeparam name="T">The type of the relation.</typeparam>
         /// <param name="foreignId">The foreign key.</param>
         /// <returns>The <see cref="Join"/> instance.</returns>
-        public static BelongsTo BelongsTo<T>(this IModel query, string primaryKey)
+        public static BelongsTo BelongsTo<T>(this IModel query, string foreignKey, string primaryKey)
         {
-            MethodBase previousMethod = Stack.GetPreviousMethod();
-            string foreignKey = previousMethod.Name.ToSnakeCase() + "_id";
+            //MethodBase previousMethod = Stack.GetPreviousMethod();
+            //string foreignKey = previousMethod.Name.ToSnakeCase() + "_id";
 
             return new BelongsTo(typeof(T), primaryKey, foreignKey);
         }

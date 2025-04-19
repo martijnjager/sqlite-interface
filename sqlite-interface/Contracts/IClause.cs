@@ -1,6 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using System.Data.Common;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -17,6 +17,6 @@ namespace Database.Contracts
 
         public bool HasConditions();
 
-        public void Bind(SQLiteCommand command);
+        public void Bind(DbCommand command);
     }
 }

@@ -1,19 +1,21 @@
 ﻿using Database.Contracts.Attribute;
+using Database.Extensions.Model.Attribute;
 using System.CodeDom;
 using System.Collections.ObjectModel;
 using System.Data.Common;
+using System.Reflection;
 
 namespace Database.Attribute
 {
     public class AttributeManager : CastManager, IAttributeManager
     {
         /// <summary>
-        /// The attributes that are mass assignable.
+        /// Keeps track of changes.
         /// </summary>
         public IDictionary<string, string> Attributes { get; private set; }
-        
+
         /// <summary>
-        /// The attributes without modification.
+        /// Attributes loaded from the database.
         /// </summary>
         public IDictionary<string, string> Original { get; private set; }
 
@@ -29,6 +31,11 @@ namespace Database.Attribute
 
         private bool isLoaded;
 
+        /// <summary>
+        /// The properties defined of the model.
+        /// </summary>
+        public IEnumerable<Property> Properties { get; private set; }
+
         public AttributeManager()
         {
             this.Attributes = new Dictionary<string, string>();
@@ -36,6 +43,18 @@ namespace Database.Attribute
             this.Original = new Dictionary<string, string>();
             this.isLoaded = false;
             this.PrimaryKey = string.Empty;
+        }
+
+        public void SetProperties(IEnumerable<Property> properties)
+        {
+            this.Properties = properties;
+
+            foreach (Property property in properties)
+            {
+                this.AddCasts(new System.Collections.Generic.List<System.Tuple<string, System.Type>> {
+                    new(property.Name, property.Type)
+                });
+            }
         }
 
         /// <summary>
@@ -83,8 +102,34 @@ namespace Database.Attribute
             return null;
         }
 
-        public void Assign(ParamBag data)
+        public void SetAttributes(IDictionary<string, dynamic?> data)
         {
+            System.Type type = this.GetType();
+
+            foreach (var pair in data)
+            {
+                var attribute = this.Properties.FirstOrDefault(x => x.Name.Equals(pair.Key));
+                bool shouldAssign = attribute is not null || !this.isLoaded;
+
+                if (!shouldAssign)
+                {
+                    continue;
+                }
+
+                this.Attributes[pair.Key] = pair.Value;
+                type.GetProperty(pair.Key)?.SetValue(this, pair.Value);
+            }
+
+            if (!this.isLoaded)
+            {
+                this.SyncOriginal();
+            }
+        }
+
+        public void AssignByReader(ParamBag data)
+        {
+            System.Type type = this.GetType();
+
             foreach (Tuple<string, dynamic, bool> parameter in data.GetParameters())
             {
                 bool shouldAssign = this.Original.ContainsKey(parameter.Item1) || !this.isLoaded;
@@ -105,7 +150,6 @@ namespace Database.Attribute
                         }
                     }
 
-                    System.Type type = this.GetType();
                     type.GetProperty(parameter.Item1)?.SetValue(this, parameter.Item2);
 
                     if (parameter.Item3)
@@ -208,6 +252,16 @@ namespace Database.Attribute
         public bool HasChanges()
         {
             return !this.Original.SequenceEqual(this.Attributes);
+        }
+
+        public bool HasChanged(string key)
+        {
+            if (this.Original.ContainsKey(key) && this.Attributes.ContainsKey(key))
+            {
+                return this.Original[key] != this.Attributes[key];
+            }
+
+            return false;
         }
 
         public bool HasPrimaryKey()

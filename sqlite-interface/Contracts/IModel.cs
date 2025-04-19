@@ -1,11 +1,12 @@
-﻿using Database.Enums;
+﻿using Database.Contracts.Cache;
+using Database.Enums;
 using Database.Extensions.Model;
 
 namespace Database.Contracts
 {
-    public interface IModel : IExpando
+    public interface IModel : IExpando, ICacheable
     {
-        void Assign(ParamBag bag);
+        void SetAttributes(IDictionary<string, dynamic?> bag);
 
         dynamic GetValue(string attribute);
 

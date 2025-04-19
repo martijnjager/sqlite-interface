@@ -7,13 +7,16 @@ using Database.Extensions.Model;
 using System.Collections.ObjectModel;
 using System.Data.Common;
 using Database.Contracts.Event;
+using Database.Extensions.Model.Attribute;
+using System.Reflection;
+using Database.Contracts.Cache;
 
 namespace Database
 {
     /// <summary>
     /// Represents a model in the database.
     /// </summary>
-    public class Model : Eloquent, IModel
+    public class Model : Eloquent, IModel, ICacheable
     {
         protected bool disableSoftDeletes = false;
 
@@ -28,6 +31,8 @@ namespace Database
                 this.Attributes.EnableTimestamps(this.disableSoftDeletes);
             }
 
+            this.Attributes.SetProperties(this.GetProperties());
+
             this.Attributes.FillDefaultColumns(columns);
         }
 
@@ -37,12 +42,12 @@ namespace Database
         /// <returns>The path of the database.</returns>
         public static string GetDatabasePath()
         {
-            return InstanceContainer.Instance.ConnectionManager().GetConnection().GetDatabasePath();
+            return App.Instance.ConnectionManager().GetConnection().GetDatabasePath();
         }
 
         public static void SetConnection(string location, string source)
         {
-            InstanceContainer.Instance.ConnectionManager().GetConnection().SetConnection(location, source);
+            App.Instance.ConnectionManager().GetConnection().SetConnection(location, source);
         }
 
         /// <summary>
@@ -59,9 +64,9 @@ namespace Database
         /// Assigns the specified data to the model.
         /// </summary>
         /// <param name="data">The data to assign.</param>
-        public void Assign(ParamBag data)
+        public void SetAttributes(IDictionary<string, dynamic?> data)
         {
-            base.Attributes.Assign(data);
+            this.Attributes.SetAttributes(data);
         }
 
         /// <summary>
@@ -89,6 +94,11 @@ namespace Database
         /// <param name="relations">The relations to load.</param>
         public void Load(string relations)
         {
+            if (string.IsNullOrEmpty(relations))
+            {
+                return;
+            }
+
             List<ToLoad> relationsToLoad = this.BuildRelationTree(relations);
 
             foreach (var r in relationsToLoad)
@@ -100,6 +110,11 @@ namespace Database
         public bool HasChanges()
         {
             return this.Attributes.HasChanges();
+        }
+
+        public bool HasChanged(string key)
+        {
+            return this.Attributes.HasChanged(key);
         }
 
         public new QueryResult<SaveStatus> Delete()
@@ -151,7 +166,7 @@ namespace Database
 
         public static List<IModel> CreateMany<T>(ParamBag[] bags) where T : IModel
         {
-            IModel model = InstanceContainer.ModelByKey(typeof(T).Name);
+            IModel model = ModelRegistry.ModelByKey(typeof(T).Name);
 
             return model.CreateMany<T>(bags);
         }
@@ -193,6 +208,18 @@ namespace Database
         public void Set(string attribute, dynamic value)
         {
             this.Attributes.Set(attribute, value);
+        }
+
+        protected IEnumerable<Property> GetProperties()
+        {
+            var modelProperties = this.GetType().GetCustomAttributes<Property>(false);
+
+            if (modelProperties == null)
+            {
+                throw new Exception("Model properties not set.");
+            }
+
+            return modelProperties;
         }
     }
 }

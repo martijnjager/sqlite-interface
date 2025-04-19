@@ -37,7 +37,7 @@ namespace Database.Attribute
             }
             else
             {
-                var newCasts = casts.FindAll(x => !this.Casts.Contains(x));
+                var newCasts = casts.FindAll(x => !this.Casts.Any(c => c.Item1 == x.Item1));
                 this.Casts.AddRange(newCasts);
             }
         }

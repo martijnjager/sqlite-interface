@@ -2,7 +2,7 @@
 using Database.Contracts;
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using System.Data.Common;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -13,13 +13,13 @@ namespace Database.Transactions
     {
         public Type Type { get; private set; }
 
-        public SQLiteCommand Query { get; private set; }
+        public DbCommand Query { get; private set; }
 
-        private SQLiteConnection Connection;
+        public DbConnection Connection { get; private set; }
 
-        private SQLiteTransaction _transaction;
+        private DbTransaction _transaction;
 
-        public Transaction(SQLiteConnection connection, SQLiteCommand query, SQLiteTransaction transaction)
+        public Transaction(DbConnection connection, DbCommand query, DbTransaction transaction)
         {
             BaseCommand.WriteLine("query: " + query.CommandText);
             this.Query = query;

@@ -1,6 +1,7 @@
 ﻿using Database;
 using Database.Contracts;
 using Database.Enums;
+using Database.Extensions.Model;
 using Database.Relations;
 using System.Reflection;
 
@@ -12,7 +13,7 @@ namespace Database
 
         public Repository()
         {
-            var model = InstanceContainer.ModelByKey(typeof(TModel).Name);
+            var model = ModelRegistry.ModelByKey(typeof(TModel).Name);
             
             if (model is null)
             {
@@ -28,7 +29,7 @@ namespace Database
 
             if (m is not null)
             {
-                m.Assign(data);
+                m.SetAttributes(data.ToDictionary());
                 return m.Create<TModel>();
             }
 
@@ -41,7 +42,7 @@ namespace Database
 
             if (foundModel is not null)
             {
-                foundModel.Assign(data);
+                foundModel.SetAttributes(data.ToDictionary());
                 return foundModel.Update<TModel>();
             }
 
@@ -101,6 +102,12 @@ namespace Database
         public List<IModel> All(string? relations = null)
         {
             List<IModel> models = this.GetModel().With(relations).Get<Model>();
+
+            //if (relations is not null)
+            //{
+            //    this.GetModel().With(relations);
+            //    RelationManager.LoadRelations(this.GetModel().Relations.ToEagerLoad(), models);
+            //}
 
             return models;
         }

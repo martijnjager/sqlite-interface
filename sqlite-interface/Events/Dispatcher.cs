@@ -1,4 +1,8 @@
-﻿using Database.Contracts;
+﻿using Database.Console;
+using Database.Contracts;
+using Database.Contracts.Cache;
+using Database.Contracts.Event;
+using Database.Extensions;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,13 +11,62 @@ using System.Threading.Tasks;
 
 namespace Database.Events
 {
-    internal class Dispatcher
+    public class Dispatcher : IEventHandler
     {
-        private readonly Dictionary<string, List<Action<IModel>>> events;
+        private readonly Dictionary<string, List<Type>> events;
+
+        private readonly Dictionary<string, List<Type>> defaultDispatchableEvents;
 
         public Dispatcher()
         {
-            this.events = new Dictionary<string, List<Action<IModel>>>();
+            this.events = [];
+            this.defaultDispatchableEvents = [];
+        }
+
+        internal void AddDefaultDispatchEvent<TObserver>(string eventName)
+        {
+            if (!this.defaultDispatchableEvents.ContainsKey(eventName))
+            {
+                this.defaultDispatchableEvents[eventName] = [];
+            }
+
+            var observerType = typeof(TObserver);
+
+            if (!this.defaultDispatchableEvents[eventName].Contains(observerType))
+            {
+                this.defaultDispatchableEvents[eventName].Add(observerType);
+            }
+        }
+
+        public IEventHandler On<TModel, TObserver>() where TObserver : IEvent where TModel : IUseEvents
+        {
+            var eventMethods = typeof(IEvent).GetMethods();
+            var eventDispatcher = App.Instance.EventDispatcher();
+
+            foreach (var method in eventMethods)
+            {
+                var modelName = typeof(TModel).Name;
+                string eventName = eventDispatcher.GenerateEventName(modelName, method.Name);
+                var observerType = typeof(TObserver);
+
+                AddListener<TObserver>(eventName);
+            }
+
+            return this;
+        }
+
+        internal void AddDefaultObserving<T>(string name) where T : IEvent
+        {
+            var eventMethods = typeof(IEvent).GetMethods();
+            var eventDispatcher = App.Instance.EventDispatcher();
+
+            foreach (var method in eventMethods)
+            {
+                string eventName = eventDispatcher.GenerateEventName(name, method.Name);
+                //var observer = App.Resolve<T>();
+                //Action<IModel> action = (Action<IModel>)Delegate.CreateDelegate(typeof(Action<IModel>), observer, method);
+                eventDispatcher.AddDefaultDispatchEvent<T>(eventName);
+            }
         }
 
         /// <summary>
@@ -21,14 +74,19 @@ namespace Database.Events
         /// </summary>
         /// <param name="eventName"></param>
         /// <param name="action"></param>
-        public void AddListener(string eventName, Action<IModel> action)
+        internal void AddListener<TObserver>(string eventName)
         {
             if (!this.events.ContainsKey(eventName))
             {
-                this.events[eventName] = new List<Action<IModel>>();
+                this.events[eventName] = [];
             }
 
-            this.events[eventName].Add(action);
+            var observerType = typeof(TObserver);
+
+            if (!this.events[eventName].Contains(observerType))
+            {
+                this.events[eventName].Add(observerType);
+            }
         }
 
         /// <summary>
@@ -37,31 +95,50 @@ namespace Database.Events
         /// <param name="eventName"></param>
         public void Dispatch(string eventName, IModel model)
         {
+            BaseCommand.WriteLine(eventName);
+
             if (this.events.ContainsKey(eventName))
             {
-                foreach (var action in this.events[eventName])
+                foreach (var observerType in this.events[eventName])
                 {
-                    action(model);
+                    InvokeObserver(observerType, eventName.Split('_')[1], model);
                 }
             }
+
+            foreach (var observers in this.defaultDispatchableEvents)
+            {
+                observers.Value.ForEach(observerType =>
+                {
+                    InvokeObserver(observerType, eventName.Split('_')[1], model);
+                });
+            }
+        }
+
+        private void InvokeObserver(Type observerType, string methodName, IModel model)
+        {
+            methodName = char.ToUpper(methodName[0]) + methodName.Substring(1);
+
+            var observerInstance = App.Create(observerType);
+            var method = observerType.GetMethod(methodName);
+            _ = method?.Invoke(observerInstance, new object[] { model });
         }
 
         /// <summary>
         /// Removes a listener for a given event.
         /// </summary>
         /// <param name="eventName"></param>
-        /// <param name="action"></param>
-        public void RemoveListener(string eventName, Action<IModel> action)
+        public void RemoveListener<TObserver>(string eventName)
         {
             if (this.events.ContainsKey(eventName))
             {
-                this.events[eventName].Remove(action);
+                var observerType = typeof(TObserver);
+                this.events[eventName].RemoveAll(listener => listener == observerType);
             }
         }
 
         /// <summary>
         /// Removes all listeners for a given event.
-        /// </summary>
+        /// </summary>z
         /// <param name="eventName"></param>
         public void RemoveAllListeners(string eventName)
         {
@@ -87,17 +164,6 @@ namespace Database.Events
         public bool HasListener(string eventName)
         {
             return this.events.ContainsKey(eventName);
-        }
-
-        /// <summary>
-        /// Returns whether or not there is a listener for a given event and action.
-        /// </summary>
-        /// <param name="eventName"></param>
-        /// <param name="action"></param>
-        /// <returns></returns>
-        public bool HasListener(string eventName, Action<IModel> action)
-        {
-            return this.events.ContainsKey(eventName) && this.events[eventName].Contains(action);
         }
 
         /// <summary>
@@ -152,16 +218,16 @@ namespace Database.Events
         /// </summary>
         /// <param name="eventName"></param>
         /// <returns></returns>
-        public List<Action<IModel>> GetListeners(string eventName)
+        public List<Type> GetListeners(string eventName)
         {
-            return this.events.ContainsKey(eventName) ? this.events[eventName] : new List<Action<IModel>>();
+            return this.events.ContainsKey(eventName) ? this.events[eventName] : new List<Type>();
         }
 
         /// <summary>
         /// Returns all listeners.
         /// </summary>
         /// <returns></returns>
-        public Dictionary<string, List<Action<IModel>>> GetAllListeners()
+        public Dictionary<string, List<Type>> GetAllListeners()
         {
             return this.events;
         }

@@ -26,7 +26,7 @@ namespace Database.Providers
         {
             foreach (IProvider provider in  providers)
             {
-                provider.Boot(InstanceContainer.Instance);
+                provider.Boot(App.Instance);
             }
         }
     }

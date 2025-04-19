@@ -68,11 +68,17 @@ namespace Database
             this.Keys.Clear();
         }
 
+        /// <summary>
+        /// MIddleware input processing
+        /// </summary>
+        /// <param name="input"></param>
+        /// <param name="parameters"></param>
+        /// <returns></returns>
         public static bool TryParse(string input, out ParamBag parameters)
         {
             string[] data = input.Split(',');
 
-            parameters = InstanceContainer.Instance.ParamBag();
+            parameters = new ParamBag();
 
             if (data.Length < 1)
             {
@@ -135,6 +141,16 @@ namespace Database
             }
 
             return foundKeys;
+        }
+
+        public IDictionary<string, dynamic?> ToDictionary()
+        {
+            IDictionary<string, dynamic?> pairs = new Dictionary<string, dynamic?>();
+            foreach (Tuple<string, dynamic, bool> item in this.Keys)
+            {
+                pairs.Add(item.Item1, item.Item2);
+            }
+            return pairs;
         }
     }
 }

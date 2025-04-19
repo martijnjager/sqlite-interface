@@ -16,7 +16,7 @@ namespace Database.Relations.Join
                 throw new Exception("No data provided for the relation.");
             }
 
-            Model m = InstanceContainer.ModelByKey(this.MainTable.Name) as Model;
+            Model m = ModelRegistry.ModelByKey(this.MainTable.Name) as Model;
             return m.WhereIn(key, values);
         }
     }

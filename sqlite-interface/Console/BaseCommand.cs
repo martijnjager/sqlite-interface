@@ -26,7 +26,7 @@ namespace Database.Console
             WriteLine(text);
         }
 
-        public static string ReadLine()
+        public static string? ReadLine()
         {
             return System.Console.ReadLine();
         }
@@ -38,12 +38,12 @@ namespace Database.Console
 
         public static void RegisterCommand<T>()
         {
-            BaseCommand commandContainer = InstanceContainer.Instance.BaseCommand();
+            BaseCommand commandContainer = App.Instance.BaseCommand();
 
-            CommandBag bag = InstanceContainer.Resolve<CommandBag>();
+            CommandBag bag = App.Resolve<CommandBag>();
             try
             {
-                ICommand command = (ICommand)InstanceContainer.Resolve<T>();
+                ICommand command = (ICommand)App.Resolve<T>();
 
                 bag.Description = command.Description;
                 bag.Signature = command.Signature;
@@ -59,7 +59,7 @@ namespace Database.Console
 
         public static void Run()
         {
-            BaseCommand commandContainer = InstanceContainer.Instance.BaseCommand();
+            BaseCommand commandContainer = App.Instance.BaseCommand();
             commandContainer.PrintCommands();
 
             string signature = ReadLine();
@@ -88,7 +88,7 @@ namespace Database.Console
             activeCommand.Invoke();
         }
 
-        public static string Parameter(string parameterKey)
+        public static string? Parameter(string parameterKey)
         {
             return activeCommand?.Parameters?.FirstOrDefault((parameter) =>
             {

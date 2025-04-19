@@ -1,11 +1,5 @@
-﻿using Database.Contracts;
-using Database.Contracts.Clause;
-using System;
-using System.Collections.Generic;
-using System.Data.SQLite;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using Database.Contracts.Clause;
+using System.Data.Common;
 
 namespace Database.Clauses
 {
@@ -39,7 +33,7 @@ namespace Database.Clauses
             return "DELETE";
         }
 
-        public new void Bind(SQLiteCommand connection)
+        public new void Bind(DbCommand connection)
         {
             // Nothing to do here
         }

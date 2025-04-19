@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Database.Extensions.Model.Attribute;
+using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using System.Data.Common;
@@ -26,9 +27,20 @@ namespace Database.Contracts.Attribute
         IList<string> RawAttributes { get; }
 
         /// <summary>
+        /// The properties defined of the model.
+        /// </summary>
+        IEnumerable<Property> Properties { get; }
+
+        /// <summary>
         /// The primary key for the model.
         /// </summary>
         string PrimaryKey { get; }
+
+        /// <summary>
+        /// Sets the properties for the model.
+        /// </summary>
+        /// <param name="properties"></param>
+        void SetProperties(IEnumerable<Property> properties);
 
         /// <summary>
         /// Sets the primary key for the model.
@@ -44,10 +56,16 @@ namespace Database.Contracts.Attribute
         dynamic GetValue(string column);
 
         /// <summary>
-        /// Sets attributes for the model.
+        /// Sets the attributes for the model.
+        /// </summary>
+        /// <param name="attributes"></param>
+        void SetAttributes(IDictionary<string, dynamic?> attributes);
+
+        /// <summary>
+        /// Sets attributes for the model from the reader.
         /// </summary>
         /// <param name="data"></param>
-        void Assign(ParamBag data);
+        void AssignByReader(ParamBag data);
 
         /// <summary>
         /// Gets the attributes by the specified keys
@@ -91,5 +109,12 @@ namespace Database.Contracts.Attribute
         /// <param name="attribute"></param>
         /// <param name="value"></param>
         void Set(string attribute, dynamic value);
+
+        /// <summary>
+        /// Indicates whether the specified attribute has been changed.
+        /// </summary>
+        /// <param name="key"></param>
+        /// <returns>true if attribute has changed since the last read from database</returns>
+        bool HasChanged(string key);
     }
 }

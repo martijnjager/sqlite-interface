@@ -3,16 +3,8 @@ using Database.Contracts;
 using Database.Contracts.Connection;
 using Database.Enums;
 using Database.Transactions;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Data;
 using System.Data.Common;
-using System.Data.SQLite;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Database.Extensions;
 using Database.Relations;
 
@@ -60,7 +52,7 @@ namespace Database.Connection
                 }
             }
 
-            if (items.Count > 0 && items.First().Relations.CanEagerLoad())
+            if (items.Count > 0 && clauseManager.Relations.Count > 0)
             { 
                 foreach (ToLoad relation in items.First().Relations.ToEagerLoad())
                 {
@@ -116,7 +108,7 @@ namespace Database.Connection
         private static IModel? MapToModel<T>(DbDataReader reader, string table, ReadOnlyCollection<DbColumn> defaultColumns) where T : IModel
         {
             ParamBag paramBag = new();
-            IModel? mainModel = InstanceContainer.ModelByKey(table, defaultColumns);
+            IModel? mainModel = ModelRegistry.ModelByKey(table, defaultColumns);
 
             if (mainModel is null)
             {
@@ -137,7 +129,7 @@ namespace Database.Connection
                 paramBag.Add(key, value);
             }
 
-            mainModel.Assign(paramBag);
+            mainModel.Attributes.AssignByReader(paramBag);
 
             return mainModel;
         }

@@ -5,7 +5,7 @@ using Database.Transactions;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.Design;
-using System.Data.SQLite;
+using System.Data.Common;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -70,6 +70,7 @@ namespace Database.Clauses
             this.table = table;
             this.Limit = -1;
             this.ExcludeColumns = new List<string>();
+            this.Relations = new List<ToLoad>();
         }
 
         public void SetRelationsToLoad(List<ToLoad> relations)
@@ -364,14 +365,14 @@ namespace Database.Clauses
                 query = CompileSelectQuery(query);
             }
 
-            var conn = InstanceContainer.Instance.ConnectionManager().GetConnection().SqliteConnection();
+            var conn = App.Instance.ConnectionManager().GetConnection().SqliteConnection();
             if (conn.State != System.Data.ConnectionState.Open)
             {
                 conn.Open();
             }
             var transaction = conn.BeginTransaction();
 
-            SQLiteCommand command = conn.CreateCommand();
+            DbCommand command = conn.CreateCommand();
             command.CommandText = query.ToString();
             command.CommandType = System.Data.CommandType.Text;
             this.Bind(command);
@@ -379,7 +380,7 @@ namespace Database.Clauses
             return new Transactions.Transaction(conn, command, transaction);
         }
 
-        protected SQLiteCommand Bind(SQLiteCommand command)
+        protected DbCommand Bind(DbCommand command)
         {
             if (wheres.HasConditions())
             {

@@ -28,7 +28,7 @@ namespace Database
         private const string MIGRATION_LOCATION = "E:\\OneDrive\\Projects\\docker\\Server\\Server\\Database\\Migrations\\Tables\\";
         private const string MODEL_LOCATION = "E:\\OneDrive\\Projects\\docker\\Server\\Server\\Database\\Models\\";
 
-        public static Migration Instance => InstanceContainer.Get<Migration>();
+        public static Migration Instance => App.Get<Migration>();
 
         public Migration()
         {
@@ -107,7 +107,8 @@ namespace Database
                     .Add("batch", newBatchIndex.ToString())
                     .Add("up", query, true)
                     .Add("down", queryDown, true);
-                model.Assign(bag);
+
+                model.SetAttributes(bag.ToDictionary());
                 model.Create<MigrationModel>();
                 Instance.RunSaveQuery(query);
                 BaseCommand.WriteLine("Finished migration");

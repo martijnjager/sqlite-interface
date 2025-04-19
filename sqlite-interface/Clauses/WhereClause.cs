@@ -1,11 +1,5 @@
 ﻿using Database.Contracts.Clause;
-using System;
-using System.Collections.Generic;
-using System.Data.Entity.ModelConfiguration.Configuration;
-using System.Data.SQLite;
-using System.Linq;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Database.Clauses
 {

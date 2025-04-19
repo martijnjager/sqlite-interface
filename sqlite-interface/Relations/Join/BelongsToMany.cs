@@ -20,7 +20,7 @@ namespace Database.Relations.Join
                 throw new Exception("No data provided for the relation.");
             }
 
-            Model m = InstanceContainer.ModelByKey(this.TargetTable.Name) as Model;
+            Model m = ModelRegistry.ModelByKey(this.TargetTable.Name) as Model;
             return m.Join(this.IntersectionTable.Name, this.PrimaryKey, "=", this.ForeignKey)
                 .Where(key, value[0]);
         }

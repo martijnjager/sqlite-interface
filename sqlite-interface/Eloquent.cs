@@ -14,6 +14,7 @@ using System;
 using Database.Extensions.Model.Attribute;
 using Database.Contracts.Event;
 using System.Data.Entity.Core.Objects.DataClasses;
+using Database.Console;
 
 namespace Database
 {
@@ -39,10 +40,10 @@ namespace Database
             this.Attributes.SetPrimaryKey(string.Empty);
             this.clauses = new ClauseManager(this.SetTable());
 
-            if (this is IEvent)
-            {
-                this.RegisterEvents();
-            }
+            //if (this is IEvent)
+            //{
+            //    this.RegisterEvents();
+            //}
         }
 
         /// <summary>
@@ -358,7 +359,7 @@ namespace Database
         {
             this.HandlePrecautions();
 
-            TransactionManager manager = InstanceContainer.Instance.ConnectionManager();
+            TransactionManager manager = App.Instance.ConnectionManager();
 
             var result = manager.Read<T>(this.clauses);
 
@@ -390,13 +391,13 @@ namespace Database
         /// Force deletes the model from the database.
         /// </summary>
         /// <returns></returns>
-        public IModel ForceDelete()
+        public IModel? ForceDelete()
         {
             this.clauses.AddDeleteClause();
 
             QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_DELETE);
 
-            if (result.Status != SaveStatus.Error)
+            if (result.Status != SaveStatus.Error && result.Data is IModel)
             {
                 return result.Data as IModel;
             }
@@ -408,7 +409,7 @@ namespace Database
         /// Restores the model from the database.
         /// </summary>
         /// <returns></returns>
-        public IModel Restore()
+        public IModel? Restore()
         {
             if (this is IUseTimestamps && this.Attributes.IsTrashed())
             {
@@ -417,7 +418,7 @@ namespace Database
 
             QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_UPDATE);
 
-            if (result.Status != SaveStatus.Error)
+            if (result.Status != SaveStatus.Error && result.Data is IModel)
             {
                 return result.Data as IModel;
             }
@@ -447,6 +448,8 @@ namespace Database
                 Transactions.Type.TYPE_INSERT => "created",
                 Transactions.Type.TYPE_UPDATE => "updated",
                 Transactions.Type.TYPE_DELETE => "deleted",
+                Transactions.Type.TYPE_SELECT => throw new NotImplementedException(),
+                _ => throw new NotImplementedException(),
             };
 
             Eloquent eloquent = this;
@@ -484,7 +487,7 @@ namespace Database
                 this.Attributes.HandleTimestamps(operation, modelExists);
             }
 
-            if (this is IEvent)
+            if (this is IUseEvents)
             {
                 string eventOperation = operation switch
                 {
@@ -576,11 +579,13 @@ namespace Database
                 throw new Exception("Primary key not set.");
             }
 
+            string modelId = this.Attributes.GetValue(this.Attributes.PrimaryKey);
+
             QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_UPDATE);
 
             if (result.Status != SaveStatus.Error)
             {
-                IModel? model = GetModel<T>();
+                IModel? model = GetModel<T>(modelId);
 
                 return model;
             }
@@ -598,7 +603,7 @@ namespace Database
             {
                 List<IModel> models = this.OrderBy("id", "desc").Limit(bags.Length).Get<T>();
 
-                if (this is IEvent)
+                if (this is IUseEvents)
                 {
                     foreach (var model in models)
                     {
@@ -622,7 +627,7 @@ namespace Database
         /// <returns>The model.</returns>
         private IModel? GetModel<T>(string? id = null) where T : IModel
         {
-            var tempModel = InstanceContainer.ModelByKey(this.GetTable()) as Model;
+            var tempModel = ModelRegistry.ModelByKey(this.GetTable()) as Model;
 
             if (string.IsNullOrEmpty(id))
             {
@@ -692,36 +697,37 @@ namespace Database
 
         private void DispatchEvent(string eventToDispatch)
         {
-            Events.Dispatcher dispatcher = InstanceContainer.Instance.EventDispatcher();
+            Events.Dispatcher dispatcher = App.Instance.EventDispatcher();
 
             IModel model = this as IModel;
-            eventToDispatch = dispatcher.GenerateEventName(this.GetTable(), eventToDispatch);
+            eventToDispatch = dispatcher.GenerateEventName(this.GetType().Name, eventToDispatch);
 
             dispatcher.Dispatch(eventToDispatch, model);
         }
 
         private void DispatchEvent(string eventToDispatch, IModel model)
         {
-            Events.Dispatcher dispatcher = InstanceContainer.Instance.EventDispatcher();
-            eventToDispatch = dispatcher.GenerateEventName(this.GetTable(), eventToDispatch);
+            Events.Dispatcher dispatcher = App.Instance.EventDispatcher();
+            string id = model.Attributes.GetValue(model.Attributes.PrimaryKey);
+            eventToDispatch = dispatcher.GenerateEventName(this.GetType().Name, eventToDispatch);
             dispatcher.Dispatch(eventToDispatch, model);
         }
 
-        private void RegisterEvents()
-        {
-            if (this is IEvent)
-            {
-                var eventMethods = typeof(IEvent).GetMethods();
-                foreach (var method in eventMethods)
-                {
-                    Events.Dispatcher dispatcher = InstanceContainer.Instance.EventDispatcher();
-                    string eventName = dispatcher.GenerateEventName(this.GetTable(), method.Name);
+        //private void RegisterEvents()
+        //{
+        //    if (this is IUseEvents)
+        //    {
+        //        var eventMethods = typeof(IEvent).GetMethods();
+        //        foreach (var method in eventMethods)
+        //        {
+        //            Events.Dispatcher dispatcher = App.Instance.EventDispatcher();
+        //            string eventName = dispatcher.GenerateEventName(this.GetTable(), method.Name, this.GetHashCode().ToString());
 
-                    Action<IModel> action = (Action<IModel>)Delegate.CreateDelegate(typeof(Action<IModel>), this, method);
+        //            Action<IModel> action = (Action<IModel>)Delegate.CreateDelegate(typeof(Action<IModel>), this, method);
                     
-                    InstanceContainer.Instance.EventDispatcher().AddListener(eventName, action);
-                }
-            }
-        }
+        //            App.Instance.EventDispatcher().AddListener(eventName, action);
+        //        }
+        //    }
+        //}
     }
 }

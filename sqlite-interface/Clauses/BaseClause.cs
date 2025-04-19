@@ -2,7 +2,7 @@
 using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Data.SQLite;
+using System.Data.Common;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -43,11 +43,11 @@ namespace Database.Clauses
             return Conditions.Count > 0;
         }
 
-        public void Bind(SQLiteCommand command)
+        public void Bind(DbCommand command)
         {
             foreach (KeyValuePair<string, string> parameter in this.Parameters)
             {
-                SQLiteParameter queryParameter = command.CreateParameter();
+                DbParameter queryParameter = command.CreateParameter();
                 queryParameter.ParameterName = parameter.Key;
                 queryParameter.Value = DBNull.Value;
 

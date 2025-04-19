@@ -1,11 +1,6 @@
-﻿using Database.Contracts;
-using Database.Contracts.Clause;
-using System;
-using System.Collections.Generic;
-using System.Data.SQLite;
-using System.Linq;
+﻿using Database.Contracts.Clause;
+using System.Data.Common;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Database.Clauses
 {
@@ -53,7 +48,7 @@ namespace Database.Clauses
             return query.ToString();
         }
 
-        public void Bind(SQLiteCommand command)
+        public void Bind(DbCommand command)
         {
             // No binding required
         }

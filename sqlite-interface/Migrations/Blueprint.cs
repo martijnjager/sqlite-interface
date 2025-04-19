@@ -48,6 +48,12 @@ namespace Database.Migrations
             return this;
         }
 
+        public Blueprint Json(string column)
+        {
+            this._table.Json(column);
+            return this;
+        }
+
         public Blueprint Timestamps()
         {
             this._table.Timestamps();
@@ -60,9 +66,9 @@ namespace Database.Migrations
             return this;
         }
 
-        public Blueprint Table(string table)
+        public Blueprint Table(string table, bool alterTable = false)
         {
-            this._table.Table(table);
+            this._table.Table(table, alterTable);
             return this;
         }
 

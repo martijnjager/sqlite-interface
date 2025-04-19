@@ -1,9 +1,10 @@
 ﻿using Database.Contracts;
-using System.Data.SQLite;
+using System.Data.Common;
 using Database.Enums;
 using Database.Console;
 using System.Data.Common;
 using Database.Transactions;
+using Microsoft.EntityFrameworkCore;
 
 namespace Database.Connection
 {
@@ -12,13 +13,25 @@ namespace Database.Connection
         const string databaseSource = @"Data Source=database.sqlite";
         const string databaseLocation = "database.sqlite";
         const string testDatabaseSource = ":memory:";
-        private SQLiteConnection? connection = null;
+        //private DbConnection? connection = null;
+        private DbContext connection;
 
         public QueryResult<SaveStatus> Result { get; protected set; }
 
         public BaseConnection(string? location = null, string? source = null)
         {
-            SetConnection(source ?? databaseSource, location ?? databaseLocation);
+            var optionsBuilder = new DbContextOptionsBuilder<DbContext>();
+            string? defaultLocation = location ?? databaseLocation;
+            string defaultSource = source ?? databaseSource;
+
+            optionsBuilder.UseSqlite(defaultSource);
+            this.connection = new DbContext(optionsBuilder.Options);
+
+            if (!defaultSource.Contains(testDatabaseSource) && !File.Exists(defaultLocation))
+            {
+                this.connection.Database.EnsureCreated();
+            }
+
             Result = new QueryResult<SaveStatus>();
         }
 
@@ -26,17 +39,21 @@ namespace Database.Connection
         {
             string? defaultLocation = location;
             string defaultSource = source;
-            if (!string.IsNullOrEmpty(defaultLocation) && !defaultSource.Contains(testDatabaseSource) && !File.Exists(defaultLocation))
+
+            if (!defaultSource.Contains(testDatabaseSource) && !File.Exists(defaultLocation))
             {
-                SQLiteConnection.CreateFile(defaultLocation);
+                this.connection.Database.EnsureCreated();
             }
 
-            connection = new SQLiteConnection(defaultSource);
+            var optionsBuilder = new DbContextOptionsBuilder<DbContext>();
+            optionsBuilder.UseSqlite(defaultSource);
+            this.connection.Dispose();
+            this.connection = new DbContext(optionsBuilder.Options);
         }
 
-        public SQLiteConnection SqliteConnection()
+        public DbConnection SqliteConnection()
         {
-            return connection ?? throw new InvalidOperationException("Connection is not initialized.");
+            return connection.Database.GetDbConnection() ?? throw new InvalidOperationException("Connection is not initialized.");
         }
 
         public string GetDatabasePath()
@@ -48,8 +65,8 @@ namespace Database.Connection
 
             OpenConnection();
 
-            string path = connection.FileName;
-            connection.Close();
+            string path = connection.Database.GetDbConnection().DataSource;
+            CloseConnection();
 
             return path;
         }
@@ -66,13 +83,10 @@ namespace Database.Connection
                 }
 
                 OpenConnection();
-                SQLiteTransaction transaction = connection.BeginTransaction();
-                SQLiteCommand command = connection.CreateCommand();
-                command.CommandText = query;
-                int numberAffectedRows = command.ExecuteNonQuery();
+                var transaction = connection.Database.BeginTransaction();
+                int numberAffectedRows = connection.Database.ExecuteSqlRaw(query);
                 transaction.Commit();
                 transaction.Dispose();
-                command.Dispose();
                 Result.SetStatus(SaveStatus.Success);
                 Result.SetMessage("Number affected rows:" + numberAffectedRows);
             }
@@ -91,7 +105,7 @@ namespace Database.Connection
 
         public QueryResult<SaveStatus> RunQuery(Transaction transaction)
         {
-            SQLiteDataReader? reader = null;
+            DbDataReader reader = null;
             int numberAffectedRows = 0;
             Result = new QueryResult<SaveStatus>();
             Result.SetStatus(SaveStatus.Pending);
@@ -153,14 +167,14 @@ namespace Database.Connection
 
         public bool IsOpen()
         {
-            return connection?.State == System.Data.ConnectionState.Open;
+            return connection.Database.GetDbConnection().State == System.Data.ConnectionState.Open;
         }
 
         public void OpenConnection()
         {
             if (!IsOpen())
             {
-                connection?.Open();
+                connection.Database.OpenConnection();
             }
         }
 
@@ -168,7 +182,7 @@ namespace Database.Connection
         {
             if (IsOpen())
             {
-                connection?.Close();
+                connection.Database.CloseConnection();
             }
         }
 
@@ -176,7 +190,7 @@ namespace Database.Connection
         {
             if (!this.IsOpen())
             {
-                await this.connection?.OpenAsync();
+                await this.connection.Database.OpenConnectionAsync();
             }
         }
 
@@ -184,7 +198,7 @@ namespace Database.Connection
         {
             if (this.IsOpen())
             {
-                await this.connection?.CloseAsync();
+                await this.connection.Database.CloseConnectionAsync();
             }
         }
     }

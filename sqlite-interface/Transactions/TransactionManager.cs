@@ -1,15 +1,8 @@
 ﻿using Database.Clauses;
 using Database.Contracts;
 using Database.Enums;
-using System.Data.SQLite;
-using System.Text;
-using System.Data;
-using System.Runtime.CompilerServices;
-using System.Data.Common;
-using System.Collections.ObjectModel;
 using Database.Contracts.Connection;
 using Database.Connection;
-using Database.Events;
 using Database.Relations;
 
 namespace Database.Transactions
@@ -102,6 +95,6 @@ namespace Database.Transactions
         /// <returns>The connection used by the manager.</returns>
         public IConnection GetConnection() => Instance.reader;
 
-        protected static TransactionManager Instance => InstanceContainer.Instance.ConnectionManager();
+        protected static TransactionManager Instance => App.Instance.ConnectionManager();
     }
 }
