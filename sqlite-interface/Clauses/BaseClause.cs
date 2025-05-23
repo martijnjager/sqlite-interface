@@ -11,15 +11,60 @@ namespace Database.Clauses
 {
     public abstract class BaseClause
     {
-        protected record Base(string Column, string Value);
+        public const string PREFIX = "";
 
-        protected List<object> Conditions { get; private set; } = new List<object>();
+        protected record Base(string? Column = null, object? Value = null, SubQuery? Subquery = null);
 
-        protected IDictionary<string, string> Parameters { get; private set; } = new Dictionary<string, string>();
+        protected record SubQuery(
+            Eloquent query,
+            string Type
+        );
+
+        protected struct SubQueryType
+        {
+            public const string Exists = "exists";
+            public const string NotExists = "not exists";
+            public const string In = "in";
+            public const string NotIn = "not in";
+        };
+
+        protected List<object> Conditions { get; private set; } = [];
+
+        public IDictionary<string, string> Parameters { get; private set; } = new Dictionary<string, string>();
+
+        public bool HasSubquery()
+        {
+            return Conditions.Any(condition => (condition as Base).Subquery is not null);
+        }
+
+        public List<object> GetConditions()
+        {
+            return Conditions;
+        }
+
+        protected string CompileSubQuery(Base condition)
+        {
+            var subquery = condition.Subquery.query.queryBuilder.Compile();
+            string sql = subquery.TrimEnd(';');
+
+            foreach (var item in condition.Subquery.query.queryBuilder.GetParameters())
+            {
+                this.Parameters.Add(item.Key, item.Value);
+            }
+
+            return condition.Subquery.Type switch
+            {
+                SubQueryType.Exists => $" EXISTS ({sql})",
+                SubQueryType.NotExists => $" NOT EXISTS ({sql})",
+                SubQueryType.In => $"{condition.Column} IN ({sql})",
+                SubQueryType.NotIn => $"{condition.Column} NOT IN ({sql})",
+                _ => $"{condition.Column} ({sql})"
+            };
+        }
 
         protected void AddCondition(object clause)
         {
-            Conditions ??= new List<object>();
+            Conditions ??= [];
 
             Conditions.Add(clause);
         }
@@ -67,28 +112,28 @@ namespace Database.Clauses
 
         protected string HandleValue(Base condition, string type, bool isNullValue = false)
         {
-            string valueName = type + (this.Parameters.Count + 1).ToString();
-            string value = isNullValue ? "null" : condition.Value;
+            string valueName = type + Guid.NewGuid().ToString("N")[..16];
+            string value = isNullValue ? "null" : condition.Value as string;
             this.Parameters.Add(valueName, value);
             return valueName;
         }
 
         protected string HandleInOperator(Base condition, string type)
         {
-            string[] options = condition.Value.Split(',');
+            string[] options = condition.Value.ToString().Split(',');
 
-            int offset = options.Length + this.Parameters.Count;
-
-            string newValue = "(" + string.Join(",", options.Select(option => type + (offset--).ToString())) + ")";
-
-            offset = options.Length + this.Parameters.Count;
+            StringBuilder builder = new("(");
 
             foreach (string option in options)
             {
-                this.Parameters.Add(type + (offset--).ToString(), option);
+                string guid = type + Guid.NewGuid().ToString("N")[..16];
+                builder.Append(guid + ",");
+                this.Parameters.Add(guid, option);
             }
 
-            return newValue;
+            builder.Remove(builder.Length - 1, 1).Append(")");
+
+            return builder.ToString();
         }
     }
 }

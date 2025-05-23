@@ -1,33 +1,45 @@
 ﻿using Database.Contracts.Clause;
+using Database.QueryBuilder;
 using System.Text;
 
 namespace Database.Clauses
 {
     public class InsertClause : BaseClause, IInsertClause
     {
-        public void AddInsertClause(string key, string value)
+        public new const string PREFIX = "@insert";
+
+        protected record Insert(string Column, object Value) : Base(Column, Value);
+
+        public void AddInsertClause(string key, object value)
         {
-            Add(new Base(key, value));
+            Add(new Insert(key, value));
         }
 
         protected override void Add<T>(T condition)
         {
-            if (condition is Base insert)
+            if (condition is Insert insert)
             {
-                int count = this.Parameters.Count;
-                this.Parameters.Add($"@insert{count}", insert.Value);
 
-                AddCondition(new Base(insert.Column, $"@insert{count}"));
+                if (insert.Value is RawSql)
+                {
+                    AddCondition(insert);
+                    return;
+                }
+
+                string guid = Guid.NewGuid().ToString("N")[..16];
+                this.Parameters.Add($"{PREFIX}{guid}", insert.Value.ToString());
+
+                AddCondition(new Insert(insert.Column, $"{PREFIX}{guid}"));
             }
         }
 
         public override string Compile()
         {
-            Base[] inserts = this.GetConditions<Base>();
+            Insert[] inserts = this.GetConditions<Insert>();
 
             StringBuilder query = new(" (");
 
-            CompileColumns(query, inserts);
+            CompileColumns(query, inserts); 
 
             query.Append(") VALUES (");
 
@@ -38,7 +50,7 @@ namespace Database.Clauses
             return query.ToString();
         }
 
-        protected void CompileColumns(StringBuilder query, Base[] inserts)
+        protected void CompileColumns(StringBuilder query, Insert[] inserts)
         {
             for (int i = 0; i < inserts.Length; i++)
             {
@@ -51,7 +63,7 @@ namespace Database.Clauses
             }
         }
 
-        protected void CompileValues(StringBuilder query, Base[] inserts)
+        protected void CompileValues(StringBuilder query, Insert[] inserts)
         {
             for (int i = 0; i < inserts.Length; i++)
             {

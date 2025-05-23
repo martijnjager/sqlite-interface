@@ -1,8 +1,6 @@
 ﻿using Database.Contracts;
 using System.Data.Common;
 using Database.Enums;
-using Database.Console;
-using System.Data.Common;
 using Database.Transactions;
 using Microsoft.EntityFrameworkCore;
 

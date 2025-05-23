@@ -12,9 +12,9 @@ namespace Database.Contracts
 
         void Load(string relations);
 
-        IModel Create<T>() where T : IModel;
+        IModel Create();
 
-        IModel Update<T>() where T : IModel;
+        IModel Update();
 
         QueryResult<SaveStatus> Delete();
 

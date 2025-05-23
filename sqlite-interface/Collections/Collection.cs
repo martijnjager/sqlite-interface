@@ -29,30 +29,5 @@ namespace Database.Collections
 
             return foundData;
         }
-
-        //private static void AddModelToJson(dynamic converted, Model model)
-        //{
-        //    foreach (KeyValuePair<string, string> data in model.GetAttributes())
-        //    {
-        //        string name = data.Key;
-        //        converted[name] = data.Value;
-        //    }
-
-        //    ICollection<string> keys = model.GetRelations().Keys;
-
-        //    if (keys.Count > 0)
-        //    {
-        //        foreach (string key in keys)
-        //        {
-
-        //            foreach (List<Model> relation in model.GetRelations()[key])
-        //            {
-        //                    converted[relationName] = relation[relationName].ToList();
-        //                AddModelToJson(relation, model);
-        //            }
-        //        }
-
-        //    }
-        //}
     }
 }

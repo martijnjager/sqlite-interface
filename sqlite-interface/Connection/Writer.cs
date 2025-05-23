@@ -13,16 +13,12 @@ namespace Database.Connection
         {
         }
 
-        public QueryResult<SaveStatus> Save(ClauseManager clauseManager)
+        public QueryResult<SaveStatus> Save(Transactions.Transaction transaction)
         {
             QueryResult<SaveStatus> result = new QueryResult<SaveStatus>();
-            Transaction? transaction = null;
 
             try
             {
-                // Opens the connection, begins the transaction and
-                // binds parameters into query
-                transaction = clauseManager.Compile();
                 result = this.RunQuery(transaction);
                 transaction.Commit();
             }
@@ -31,10 +27,6 @@ namespace Database.Connection
                 transaction?.Rollback();
                 result.SetStatus(SaveStatus.Error);
                 result.SetMessage(ex.Message);
-            }
-            finally
-            {
-                transaction?.Close();
             }
 
             return result;

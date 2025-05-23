@@ -18,6 +18,7 @@ namespace Database.Console
 
         public static void WriteLine(string line = "")
         {
+            line = DateTime.Now.ToLongTimeString() + ": " + line;
             System.Console.WriteLine(line);
         }
 

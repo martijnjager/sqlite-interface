@@ -30,7 +30,7 @@ namespace Database
             if (m is not null)
             {
                 m.SetAttributes(data.ToDictionary());
-                return m.Create<TModel>();
+                return m.Create();
             }
 
             throw new InvalidOperationException("Model not found.");
@@ -38,12 +38,12 @@ namespace Database
 
         public IModel Update(string id, ParamBag data)
         {
-            IModel? foundModel = this.GetModel()?.Find<TModel>(id);
+            IModel? foundModel = this.GetModel()?.Find(id);
 
             if (foundModel is not null)
             {
                 foundModel.SetAttributes(data.ToDictionary());
-                return foundModel.Update<TModel>();
+                return foundModel.Update();
             }
 
             throw new InvalidOperationException("Model not found.");
@@ -58,7 +58,7 @@ namespace Database
                 this.DontSelect(except);
             }
 
-            var foundModel = query.First<Model>();
+            var foundModel = query.First();
 
             if (foundModel is not null && relations is not null)
             {
@@ -68,7 +68,7 @@ namespace Database
             return foundModel;
         }
 
-        public List<IModel> FindWhere(string key, string value, string? relations = null, string[]? except = null)
+        public Collection FindWhere(string key, string value, string? relations = null, string[]? except = null)
         {
             var query = this.GetModel().With(relations).Where(key, value);
 
@@ -77,7 +77,7 @@ namespace Database
                 this.DontSelect(except);
             }
 
-            var models = query.Get<IModel>();
+            var models = query.Get();
 
             if (relations is not null)
             {
@@ -89,7 +89,7 @@ namespace Database
 
         public IModel? Get(string id, string? relations = null)
         {
-            IModel? model = this.GetModel().Find<Model>(id);
+            IModel? model = this.GetModel().Find(id);
 
             if (model is not null && relations is not null)
             {
@@ -99,9 +99,9 @@ namespace Database
             return model;
         }
 
-        public List<IModel> All(string? relations = null)
+        public Collection All(string? relations = null)
         {
-            List<IModel> models = this.GetModel().With(relations).Get<Model>();
+            Collection models = this.GetModel().With(relations).Get();
 
             //if (relations is not null)
             //{

@@ -118,7 +118,7 @@ namespace Database.Events
         {
             methodName = char.ToUpper(methodName[0]) + methodName.Substring(1);
 
-            var observerInstance = App.Create(observerType);
+            object observerInstance = App.Create(observerType);
             var method = observerType.GetMethod(methodName);
             _ = method?.Invoke(observerInstance, new object[] { model });
         }
@@ -132,7 +132,7 @@ namespace Database.Events
             if (this.events.ContainsKey(eventName))
             {
                 var observerType = typeof(TObserver);
-                this.events[eventName].RemoveAll(listener => listener == observerType);
+                this.events[eventName].RemoveAll(listener => listener.Equals(observerType));
             }
         }
 

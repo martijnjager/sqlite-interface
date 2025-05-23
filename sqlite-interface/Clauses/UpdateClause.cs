@@ -5,24 +5,28 @@ namespace Database.Clauses
 {
     public class UpdateClause : BaseClause, IUpdateClause
     {
+        public new const string PREFIX = "@update";
+        
+        protected record Update(string Column, object Value) : Base(Column, Value);
+
         public void AddUpdateClause(string key, string value)
         {
-            this.Add(new Base(key, value));
+            this.Add(new Update(key, value));
         }
 
         protected override void Add<T>(T condition)
         {
-            if (condition is Base update)
+            if (condition is Update update)
             {
-                string valueName = "@update" + (this.Parameters.Count + 1).ToString();
+                string valueName = PREFIX + Guid.NewGuid().ToString("N")[..16];
 
-                if (IsNull(update.Value))
+                if (IsNull(update.Value.ToString()))
                 {
                     this.Parameters.Add(valueName, "null");
                 }
                 else
                 {
-                    this.Parameters.Add(valueName, update.Value);
+                    this.Parameters.Add(valueName, update.Value.ToString());
                 }
 
                 update = update with { Value = valueName };
@@ -35,7 +39,7 @@ namespace Database.Clauses
         {
             StringBuilder query = new(" SET ");
 
-            Base[] updates = this.GetConditions<Base>();
+            Update[] updates = this.GetConditions<Update>();
 
             for (int i = 0; i < updates.Length; i++)
             {

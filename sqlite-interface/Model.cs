@@ -129,7 +129,7 @@ namespace Database
             return base.Delete();
         }
 
-        public new IModel Restore()
+        public new IModel? Restore()
         {
             if (!this.Attributes.HasPrimaryKey())
             {
@@ -140,7 +140,7 @@ namespace Database
             return base.Restore();
         }
 
-        public new IModel Update<T>() where T : IModel
+        public new IModel Update()
         {
             if (!this.Attributes.HasPrimaryKey())
             {
@@ -149,26 +149,31 @@ namespace Database
 
             this.Where(this.Attributes.PrimaryKey, this.Attributes.GetValue(this.Attributes.PrimaryKey));
 
-            return base.Update<T>();
+            return base.Update();
         }
 
-        public new IModel Create<T>() where T : IModel
+        public new IModel Create()
         {
             if (this.Attributes.HasPrimaryKey())
             {
-                return this.Update<T>();
+                return this.Update();
             }
 
             this.Where(this.Attributes.PrimaryKey, this.Attributes.GetValue(this.Attributes.PrimaryKey));
 
-            return base.Create<T>();
+            return base.Create();
         }
 
-        public static List<IModel> CreateMany<T>(ParamBag[] bags) where T : IModel
+        public static Collection CreateMany(string modelName, ParamBag[] bags)
         {
-            IModel model = ModelRegistry.ModelByKey(typeof(T).Name);
+            IModel? model = ModelRegistry.ModelByKey(modelName);
 
-            return model.CreateMany<T>(bags);
+            if (model == null)
+            {
+                return [];
+            }
+
+            return model.CreateMany(bags);
         }
 
         /// <summary>
@@ -195,7 +200,7 @@ namespace Database
             var relationsToLoad = this.BuildRelationTree(relations);
 
             this.Relations.LoadEager(relationsToLoad);
-            this.clauses.SetRelationsToLoad(relationsToLoad);
+            this.queryBuilder.SetRelationsToLoad(relationsToLoad);
 
             return this;
         }

@@ -15,6 +15,7 @@ using Database.Extensions.Model.Attribute;
 using Database.Contracts.Event;
 using System.Data.Entity.Core.Objects.DataClasses;
 using Database.Console;
+using Database.Contracts.Relation;
 
 namespace Database
 {
@@ -27,7 +28,7 @@ namespace Database
 
         public IAttributeManager Attributes { get; }
 
-        protected ClauseManager clauses;
+        internal QueryBuilder.Builder queryBuilder;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Eloquent"/> class.
@@ -38,7 +39,8 @@ namespace Database
             this.Relations = new RelationManager();
             this.Attributes = new AttributeManager();
             this.Attributes.SetPrimaryKey(string.Empty);
-            this.clauses = new ClauseManager(this.SetTable());
+            this.queryBuilder = new QueryBuilder.Builder(this.SetTable());
+
 
             //if (this is IEvent)
             //{
@@ -72,7 +74,7 @@ namespace Database
         /// <returns>The table name.</returns>
         public string GetTable()
         {
-            return this.clauses.GetTable();
+            return this.queryBuilder.GetTable();
         }
 
         /// <summary>
@@ -89,6 +91,11 @@ namespace Database
             return this.Attributes.Attributes;
         }
 
+        public IDictionary<string, dynamic> GetCustomAttributes()
+        {
+            return this.Attributes.CustomAttributes;
+        }
+
         public IList<string> GetRawAttributes()
         {
             return this.Attributes.RawAttributes;
@@ -100,10 +107,10 @@ namespace Database
         /// <typeparam name="T">The type of the model.</typeparam>
         /// <param name="value">The value to search for.</param>
         /// <returns>The found model.</returns>
-        public IModel? Find<T>(string value) where T : IModel
+        public IModel? Find(string value)
         {
             string primaryKey = this.Attributes.PrimaryKey;
-            List<IModel> result = this.Where(primaryKey, value).Get<T>();
+            Collection result = this.Where(primaryKey, value).Get();
 
             return result.FirstOrDefault();
         }
@@ -117,7 +124,7 @@ namespace Database
         {
             foreach (var column in columns)
             {
-                this.clauses.AddSelectColumn(column);
+                this.queryBuilder.AddSelectColumn(column);
             }
 
             return this;
@@ -132,7 +139,7 @@ namespace Database
         {
             foreach (var column in columns)
             {
-                this.clauses.DontSelectColumn(column);
+                this.queryBuilder.DontSelectColumn(column);
             }
 
             return this;
@@ -142,7 +149,7 @@ namespace Database
         {
             foreach (var column in columns)
             {
-                this.clauses.RemoveDontSelect(column);
+                this.queryBuilder.RemoveDontSelect(column);
             }
 
             return this;
@@ -157,7 +164,7 @@ namespace Database
         {
             foreach (var column in columns)
             {
-                this.clauses.AddSelectColumn(column.Key, column.Value);
+                this.queryBuilder.AddSelectColumn(column.Key, column.Value);
             }
 
             return this;
@@ -173,7 +180,7 @@ namespace Database
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
         public Eloquent Join(string table, string first, string op, string second)
         {
-            this.clauses.AddJoinClause(table, first, op, second);
+            this.queryBuilder.AddJoinClause(table, first, op, second);
 
             return this;
         }
@@ -186,7 +193,7 @@ namespace Database
         /// <param name="op">The operator to use.</param>
         /// <param name="value">The value to compare.</param>
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
-        public Eloquent Where(string where, string op, string? value = null)
+        public Eloquent Where(string where, object op, object? value = null)
         {
             if (value is null)
             {
@@ -195,14 +202,14 @@ namespace Database
                 op = Operator.Equals;
             }
 
-            this.clauses.AddWhereClause(where, op, value);
+            this.queryBuilder.AddWhereClause(where, op as string, value);
 
             return this;
         }
 
         public Eloquent WhereIn(string key, params object[] values)
         {
-            this.clauses.AddWhereInClause(key, values);
+            this.queryBuilder.AddWhereInClause(key, values);
 
             return this;
         }
@@ -231,7 +238,7 @@ namespace Database
             return this;
         }
 
-        public Eloquent OrWhere(string where, string op, string? value = null)
+        public Eloquent OrWhere(string where, object op, object? value = null)
         {
             if (value is null)
             {
@@ -240,7 +247,7 @@ namespace Database
                 op = Operator.Equals;
             }
 
-            this.clauses.AddOrWhereClause(where, op, value);
+            this.queryBuilder.AddOrWhereClause(where, op.ToString(), value);
 
             return this;
         }
@@ -252,9 +259,100 @@ namespace Database
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
         public Eloquent Where(Action<Eloquent> callback)
         {
-            this.clauses.AddNestedWhereClause(callback, this);
+            this.queryBuilder.AddNestedWhereClause(callback, this);
             return this;
         }
+
+        public Eloquent WhereHas(string relation, Action<Eloquent> callback)
+        {
+            try
+            {
+                var methodData = this.GetType().GetMethod(relation);
+
+                if (methodData is not null)
+                {
+                    var join = methodData.Invoke(this, null) as IJoin;
+
+                    var subquery = join.Query();
+
+                    this.queryBuilder.AddWhereHasClause(relation, callback, subquery, join);
+
+                    return this;
+                }
+
+                throw new ArgumentException();
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public Eloquent WhereHas(string relation)
+        {
+            try
+            {
+                var methodData = this.GetType().GetMethod(relation);
+                if (methodData is not null)
+                {
+                    var join = methodData.Invoke(this, null) as IJoin;
+                    var subquery = join.Query();
+                    this.queryBuilder.AddWhereHasClause(relation, null, subquery, join);
+                    return this;
+                }
+                throw new ArgumentException();
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public Eloquent WhereDoesntHave(string relation, Action<Eloquent> callback)
+        {
+            try
+            {
+                var methodData = this.GetType().GetMethod(relation, BindingFlags.IgnoreCase);
+
+                if (methodData is not null)
+                {
+                    var join = methodData.Invoke(this, null) as IJoin;
+
+                    var subquery = join.Query();
+
+                    this.queryBuilder.AddWhereHasNotClause(relation, callback, subquery, join);
+
+                    return this;
+                }
+
+                throw new ArgumentException();
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
+        public Eloquent WhereDoesntHave(string relation)
+        {
+            try
+            {
+                var methodData = this.GetType().GetMethod(relation, BindingFlags.IgnoreCase);
+                if (methodData is not null)
+                {
+                    var join = methodData.Invoke(this, null) as IJoin;
+                    var subquery = join.Query();
+                    this.queryBuilder.AddWhereHasNotClause(relation, null, subquery, join);
+                    return this;
+                }
+                throw new ArgumentException();
+            }
+            catch (Exception ex)
+            {
+                throw ex;
+            }
+        }
+
         #endregion
 
         /// <summary>
@@ -264,7 +362,7 @@ namespace Database
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
         public Eloquent GroupBy(string column)
         {
-            this.clauses.AddGroupBy(column);
+            this.queryBuilder.AddGroupBy(column);
             return this;
         }
 
@@ -276,7 +374,7 @@ namespace Database
         /// <param name="op">The operator to use.</param>
         /// <param name="value">The value to compare.</param>
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
-        public Eloquent Having(string have, string op, string? value = null)
+        public Eloquent Having(string have, object op, object? value = null)
         {
             if (value is null)
             {
@@ -284,12 +382,12 @@ namespace Database
                 op = Operator.Equals;
             }
 
-            this.clauses.AddHavingClause(have, op, value);
+            this.queryBuilder.AddHavingClause(have, op as string, value);
 
             return this;
         }
 
-        public Eloquent OrHaving(string have, string op, string? value = null)
+        public Eloquent OrHaving(string have, object op, object? value = null)
         {
             if (value is null)
             {
@@ -297,14 +395,14 @@ namespace Database
                 op = Operator.Equals;
             }
 
-            this.clauses.AddOrHavingClause(have, op, value);
+            this.queryBuilder.AddOrHavingClause(have, op as string, value);
 
             return this;
         }
 
         public Eloquent Having(Action<Eloquent> callback)
         {
-            this.clauses.AddNestedHavingClause(callback, this);
+            this.queryBuilder.AddNestedHavingClause(callback, this);
 
             return this;
         }
@@ -330,7 +428,7 @@ namespace Database
         /// <returns>The <see cref="Eloquent"/> instance.</returns>
         public Eloquent Limit(int limit)
         {
-            this.clauses.SetLimit(limit);
+            this.queryBuilder.SetLimit(limit);
 
             return this;
         }
@@ -355,16 +453,15 @@ namespace Database
         /// <typeparam name="T">The type of the model.</typeparam>
         /// <returns>A list of models.</returns>
         /// <exception cref="">Thrown when an exception occurs.</exception>
-        public List<IModel> Get<T>() where T : IModel
+        public Collection Get()
         {
             this.HandlePrecautions();
 
             TransactionManager manager = App.Instance.ConnectionManager();
 
-            var result = manager.Read<T>(this.clauses);
+            Collection result = manager.Read(this.queryBuilder);
 
-            this.clauses.ClearClauses();
-            this.Relations.Reset();
+            //this.Relations.Reset();
 
             return result;
         }
@@ -378,10 +475,10 @@ namespace Database
             // check soft delete, then delete
             if (this is IUseTimestamps)
             {
-                this.clauses.AddSoftDeleteClause();
+                this.queryBuilder.AddSoftDeleteClause();
             } else
             {
-                this.clauses.AddDeleteClause();
+                this.queryBuilder.AddDeleteClause();
             }
 
             return this.RunQuery(Transactions.Type.TYPE_DELETE);
@@ -393,7 +490,7 @@ namespace Database
         /// <returns></returns>
         public IModel? ForceDelete()
         {
-            this.clauses.AddDeleteClause();
+            this.queryBuilder.AddDeleteClause();
 
             QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_DELETE);
 
@@ -413,7 +510,7 @@ namespace Database
         {
             if (this is IUseTimestamps && this.Attributes.IsTrashed())
             {
-                this.clauses.AddRestoreClause();
+                this.queryBuilder.AddRestoreClause();
             }
 
             QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_UPDATE);
@@ -430,8 +527,8 @@ namespace Database
         {
             this.CompileAttributesToClause(type);
 
-            var result = TransactionManager.Save(this.clauses);
-            this.clauses.ClearClauses();
+            var result = TransactionManager.Save(this.queryBuilder);
+            //this.queryBuilder.Clea();
 
             if (this is IEvent)
             {
@@ -445,9 +542,9 @@ namespace Database
         {
             string eventToDispatch = transactionType switch
             {
-                Transactions.Type.TYPE_INSERT => "created",
-                Transactions.Type.TYPE_UPDATE => "updated",
-                Transactions.Type.TYPE_DELETE => "deleted",
+                Transactions.Type.TYPE_INSERT => Events.EventType.CREATED,
+                Transactions.Type.TYPE_UPDATE => Events.EventType.UPDATED,
+                Transactions.Type.TYPE_DELETE => Events.EventType.DELETED,
                 Transactions.Type.TYPE_SELECT => throw new NotImplementedException(),
                 _ => throw new NotImplementedException(),
             };
@@ -455,7 +552,7 @@ namespace Database
             Eloquent eloquent = this;
             IModel model = null;
 
-            if (this is IUseTimestamps && eventToDispatch == "deleted")
+            if (this is IUseTimestamps && eventToDispatch == Events.EventType.DELETED)
             {
                 eloquent = this.WithTrashed();
             }
@@ -463,16 +560,16 @@ namespace Database
             switch (transactionType)
             {
                 case Transactions.Type.TYPE_INSERT:
-                    model = eloquent.OrderBy("id", "desc").First<IModel>();
+                    model = eloquent.OrderBy("id", "desc").First();
                     break;
                 case Transactions.Type.TYPE_UPDATE:
                 case Transactions.Type.TYPE_DELETE:
-                    model = eloquent.Find<IModel>(eloquent.Attributes.GetValue(eloquent.Attributes.PrimaryKey));
+                    model = eloquent.Find(eloquent.Attributes.GetValue(eloquent.Attributes.PrimaryKey));
                     break;
             }
 
             this.DispatchEvent(eventToDispatch, model);
-            this.DispatchEvent("saved", model);
+            this.DispatchEvent(Events.EventType.SAVED, model);
         }
 
         /// <summary>
@@ -491,13 +588,14 @@ namespace Database
             {
                 string eventOperation = operation switch
                 {
-                    Transactions.Type.TYPE_INSERT => "creating",
-                    Transactions.Type.TYPE_UPDATE => "updating",
-                    Transactions.Type.TYPE_DELETE => "deleting",
+                    Transactions.Type.TYPE_INSERT => Events.EventType.CREATING,
+                    Transactions.Type.TYPE_UPDATE => Events.EventType.UPDATING,
+                    Transactions.Type.TYPE_DELETE => Events.EventType.DELETING,
+                    _ => throw new NotImplementedException(),
                 };
 
                 this.DispatchEvent(eventOperation);
-                this.DispatchEvent("saving");
+                this.DispatchEvent(Events.EventType.SAVING);
             }
 
             foreach (var item in Attributes.GetChanges())
@@ -511,15 +609,15 @@ namespace Database
                 switch (operation)
                 {
                     case Transactions.Type.TYPE_INSERT:
-                        this.clauses.AddInsertClause(item.Key, item.Value);
+                        this.queryBuilder.AddInsertClause(item.Key, item.Value);
                         break;
                     case Transactions.Type.TYPE_UPDATE:
-                        this.clauses.AddUpdateClause(item.Key, item.Value);
+                        this.queryBuilder.AddUpdateClause(item.Key, item.Value);
                         break;
                     case Transactions.Type.TYPE_DELETE:
                         if (item.Key == TimestampManager.DELETED_AT && this.CanBeSoftDeleted())
                         {
-                            this.clauses.AddUpdateClause(item.Key, item.Value);
+                            this.queryBuilder.AddUpdateClause(item.Key, item.Value);
                         }
                         else
                         {
@@ -544,7 +642,7 @@ namespace Database
                 keyValues.Add(keyValue);
             }
 
-            this.clauses.AddInsertManyClause(keyValues);
+            this.queryBuilder.AddInsertManyClause(keyValues);
         }
 
         /// <summary>
@@ -552,13 +650,13 @@ namespace Database
         /// </summary>
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
-        public IModel Create<T>() where T : IModel
+        public IModel? Create()
         {
             QueryResult<SaveStatus> result = this.RunQuery(Transactions.Type.TYPE_INSERT);
 
             if (result.Status != SaveStatus.Error)
             {
-                IModel? model = GetModel<T>();
+                IModel? model = GetModel();
 
                 return model;
             }
@@ -572,7 +670,7 @@ namespace Database
         /// <typeparam name="T"></typeparam>
         /// <returns></returns>
         /// <exception cref="Exception"></exception>
-        public IModel Update<T>() where T : IModel
+        public IModel? Update()
         {
             if (!this.Attributes.HasPrimaryKey())
             {
@@ -585,7 +683,7 @@ namespace Database
 
             if (result.Status != SaveStatus.Error)
             {
-                IModel? model = GetModel<T>(modelId);
+                IModel? model = GetModel(modelId);
 
                 return model;
             }
@@ -593,23 +691,23 @@ namespace Database
             throw new Exception(result.Message);
         }
 
-        public List<IModel> CreateMany<T>(ParamBag[] bags) where T : IModel
+        public Collection CreateMany(ParamBag[] bags)
         {
             this.CompileManyToClause(bags, Transactions.Type.TYPE_INSERT);
 
-            var result = TransactionManager.Save(this.clauses);
+            var result = TransactionManager.Save(this.queryBuilder);
 
             if (result.Status != SaveStatus.Error)
             {
-                List<IModel> models = this.OrderBy("id", "desc").Limit(bags.Length).Get<T>();
+                Collection models = this.OrderBy("id", "desc").Limit(bags.Length).Get();
 
                 if (this is IUseEvents)
                 {
                     foreach (var model in models)
                     {
-                        this.DispatchEvent("created", model);
-                        this.DispatchEvent("saved", model);
-                        this.DispatchEvent("retrieved", model);
+                        this.DispatchEvent(Events.EventType.CREATED, model);
+                        this.DispatchEvent(Events.EventType.SAVED, model);
+                        this.DispatchEvent(Events.EventType.READ, model);
                     }
                 }
 
@@ -625,16 +723,16 @@ namespace Database
         /// <param name="isNew">True if the model is new, false otherwise.</param>
         /// <param name="primaryKey">The primary key of the model.</param>
         /// <returns>The model.</returns>
-        private IModel? GetModel<T>(string? id = null) where T : IModel
+        private IModel? GetModel(string? id = null)
         {
             var tempModel = ModelRegistry.ModelByKey(this.GetTable()) as Model;
 
             if (string.IsNullOrEmpty(id))
             {
-                return tempModel?.OrderBy("id", "desc")?.First<T>();
+                return tempModel?.OrderBy("id", "desc")?.First();
             }
 
-            return tempModel?.Find<T>(id);
+            return tempModel?.Find(id);
         }
 
         /// <summary>
@@ -642,10 +740,10 @@ namespace Database
         /// </summary>
         /// <typeparam name="T">The type of the model.</typeparam>
         /// <returns>The first model.</returns>
-        public IModel? First<T>() where T : IModel
+        public IModel? First()
         {
-            this.clauses.SetLimit(1);
-            return this.Get<T>().FirstOrDefault();
+            this.queryBuilder.SetLimit(1);
+            return this.Get().FirstOrDefault();
         }
 
         /// <summary>
@@ -655,14 +753,14 @@ namespace Database
         {
             if (this.Attributes.TimestampsEnabled() &&
                 this is IUseTimestamps &&
-                !this.clauses.HasWhereColumn(TimestampManager.SOFT_DELETE_COLUMN))
+                !this.queryBuilder.HasWhereColumn(TimestampManager.SOFT_DELETE_COLUMN))
             {
                 this.WhereNull(TimestampManager.SOFT_DELETE_COLUMN);
             }
 
-            if (this.clauses.QueryType is null)
+            if (this.queryBuilder.QueryType is null)
             {
-                this.clauses.AddSelectColumn("*");
+                this.queryBuilder.AddSelectColumn("*");
             }
         }
 
@@ -673,7 +771,7 @@ namespace Database
         /// <param name="order"></param>
         private void AddOrder(string column, string order)
         {
-            this.clauses.AddOrderBy(column, order);
+            this.queryBuilder.AddOrderBy(column, order);
         }
 
         /// <summary>

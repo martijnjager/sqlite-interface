@@ -10,6 +10,6 @@ namespace Database.Contracts.Connection
 {
     internal interface IWriter : IConnection, IDisposable
     {
-        QueryResult<SaveStatus> Save(ClauseManager clauseManager);
+        QueryResult<SaveStatus> Save(Transactions.Transaction transaction);
     }
 }

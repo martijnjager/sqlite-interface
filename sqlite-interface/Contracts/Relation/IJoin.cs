@@ -16,6 +16,12 @@ namespace Database.Contracts.Relation
         public string ForeignKey { get; }
         public RelationType Type { get; }
 
+        public string MainTableName { get => MainTable.Name; }
+
+        public string TargetTableName { get => TargetTable.Name; }
+
         Eloquent BuildQuery(string key, dynamic[] values);
+
+        Eloquent Query();
     }
 }

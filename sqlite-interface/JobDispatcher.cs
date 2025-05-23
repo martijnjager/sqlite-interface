@@ -45,7 +45,7 @@ namespace Database
                         {
                             method.Invoke(job, new object[] { data });
                         }
-                        catch (Exception ex)
+                        catch (Exception)
                         {
                             throw;
                         }

@@ -8,6 +8,6 @@ namespace Database.Contracts.Clause
 {
     public interface IInsertClause : IClause
     {
-        public void AddInsertClause(string key, string value);
+        public void AddInsertClause(string key, object value);
     }
 }

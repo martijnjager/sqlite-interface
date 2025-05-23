@@ -6,7 +6,7 @@ namespace Database.Clauses
 {
     public class JoinClause : BaseClause, IJoinClause
     {
-        protected struct Join
+        internal struct Join
         {
             public Join() { }
             public string Table { get; set; }

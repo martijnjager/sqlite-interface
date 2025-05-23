@@ -15,6 +15,12 @@ namespace Database.Extensions
             var frames = stackTrace.GetFrames();
             var secondToLastFrame = frames[2];
             var method = secondToLastFrame.GetMethod();
+
+            if (method == null)
+            {
+                throw new InvalidOperationException("Method not found.");
+            }
+
             return method;
         }
     }

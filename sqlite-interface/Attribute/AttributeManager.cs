@@ -15,6 +15,11 @@ namespace Database.Attribute
         public IDictionary<string, string> Attributes { get; private set; }
 
         /// <summary>
+        /// The attributes that are custom set by the user
+        /// </summary>
+        public IDictionary<string, dynamic> CustomAttributes { get; private set; } = new Dictionary<string, dynamic>();
+
+        /// <summary>
         /// Attributes loaded from the database.
         /// </summary>
         public IDictionary<string, string> Original { get; private set; }
@@ -78,7 +83,7 @@ namespace Database.Attribute
         /// </summary>
         /// <param name="column"></param>
         /// <returns></returns>
-        public dynamic GetValue(string column)
+        public dynamic? GetValue(string column)
         {
             if (Attributes.TryGetValue(column, out string? attributeValue))
             {
@@ -174,7 +179,21 @@ namespace Database.Attribute
         
         public void Set(string attribute, dynamic value)
         {
-            this.Attributes[attribute] = value.ToString();
+            if (this.Attributes.ContainsKey(attribute))
+            {
+                this.Attributes[attribute] = value.ToString();
+            }
+            else
+            {
+                if (this.CustomAttributes.ContainsKey(attribute))
+                {
+                    this.CustomAttributes[attribute] = value;
+                }
+                else
+                {
+                    this.CustomAttributes.Add(attribute, value);
+                }
+            }
         }
 
         public void ResyncOriginal()

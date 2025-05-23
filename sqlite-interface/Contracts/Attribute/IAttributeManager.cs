@@ -17,6 +17,11 @@ namespace Database.Contracts.Attribute
         IDictionary<string, string> Attributes { get; }
 
         /// <summary>
+        /// The attributes that are custom set by user.
+        /// </summary>
+        IDictionary<string, dynamic> CustomAttributes { get; }
+
+        /// <summary>
         /// The attributes without modification.
         /// </summary>
         IDictionary<string, string> Original { get; }

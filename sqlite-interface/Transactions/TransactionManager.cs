@@ -4,6 +4,8 @@ using Database.Enums;
 using Database.Contracts.Connection;
 using Database.Connection;
 using Database.Relations;
+using System.Net.WebSockets;
+using System.Data.Common;
 
 namespace Database.Transactions
 {
@@ -12,7 +14,9 @@ namespace Database.Transactions
     /// </summary>
     public class TransactionManager : ITransactionManager
     {
-        //private Transaction? transaction;
+        private Transaction? activeTransaction;
+
+        //private readonly List<DbCommand> pendingQueries;
 
         //private readonly IConnection connection;
 
@@ -28,6 +32,7 @@ namespace Database.Transactions
         public TransactionManager()
         {
             this.reader = new Reader();
+            //this.pendingQueries = new List<DbCommand>();
         }
 
         public void SetConnection(string location, string source)
@@ -36,30 +41,41 @@ namespace Database.Transactions
             this.writer?.SetConnection(source, location);
         }
 
+        public static Transaction CreateTransaction(QueryBuilder.Builder queryBuilder, string query)
+        {
+            // dont use same transaction, database connection does not like it
+            return Transaction.CreateTransaction(queryBuilder, query);
+        }
+
         /// <summary>
         /// Runs a transaction to create/update/delete one or more model.
         /// </summary>
         /// <param name="model">The model to run the transaction on.</param>
         /// <param name="operation">The operation to perform on the model.</param>
         /// <returns>The result of the transaction.</returns>
-        public static QueryResult<SaveStatus> Save(ClauseManager clauseManager)
+        public static QueryResult<SaveStatus> Save(QueryBuilder.Builder queryBuilder)
         {
             if (Instance.writer is not null)
             {
                 throw new Exception("A transaction is already in progress.");
             }
 
-            if (clauseManager.QueryType == Type.TYPE_SELECT)
+            if (queryBuilder.QueryType == Type.TYPE_SELECT)
             {
                 throw new Exception("Cannot save a select query.");
             }
 
             Instance.writer = new Writer();
 
-            QueryResult<SaveStatus> result = Instance.writer.Save(clauseManager);
+            var query = queryBuilder.Compile();
+            var transaction = CreateTransaction(queryBuilder, query);
+
+            QueryResult<SaveStatus> result = Instance.writer.Save(transaction);
 
             Instance.writer.Dispose();
             Instance.writer = null;
+            transaction?.Close();
+            transaction = null;
 
             return result;
         }
@@ -69,22 +85,19 @@ namespace Database.Transactions
         /// </summary>
         /// <typeparam name="T">The type of the models.</typeparam>
         /// <returns>A list of models.</returns>
-        public List<IModel> Read<T>(ClauseManager clauseManager) where T : IModel
+        public Collection Read(QueryBuilder.Builder queryBuilder)
         {
-            if (clauseManager.QueryType != Type.TYPE_SELECT)
+            if (queryBuilder.QueryType != Type.TYPE_SELECT)
             {
                 throw new Exception("Transaction must be a select query with this function.");
             }
 
-            List<IModel> models = this.reader.Read<T>(clauseManager);
+            var query = queryBuilder.Compile();
+            var transaction = CreateTransaction(queryBuilder, query);
 
-            if (clauseManager.Relations is not null)
-            {
-                if (clauseManager.Relations.Count > 0)
-                {
-                    RelationManager.LoadRelations(clauseManager.Relations, models);
-                }
-            }
+            Collection models = this.reader.Read(transaction);
+            transaction?.Close();
+            transaction = null;
 
             return models;
         }

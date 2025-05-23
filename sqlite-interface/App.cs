@@ -35,7 +35,13 @@ namespace Database
         public static void RegisterByNamespace(Assembly assembly, string namespaceName)
         {
             Type[] typeList = assembly.GetTypes();
-            List<Type> types = typeList.Where(t => t.FullName.Contains(namespaceName) && !t.Name.Contains('<')).ToList();
+
+            if (typeList.Length < 1)
+            {
+                return;
+            }
+
+            List<Type> types = [.. typeList.Where(t => t.FullName != null && t.FullName.Contains(namespaceName) && !t.Name.Contains('<'))];
 
             foreach (Type type in types)
             {
@@ -43,19 +49,19 @@ namespace Database
             }
         }
 
-        public static List<object> RegisterByNamespace(string namespaceName, IEnumerable<string> includeOnly = null, IEnumerable<string> exclude = null)
+        public static List<object> RegisterByNamespace(string namespaceName, IEnumerable<string>? includeOnly = null, IEnumerable<string>? exclude = null)
         {
-            List<object> instances = new();
+            List<object> instances = [];
             var classesInNamespace = Instance.bindItems.Where(x => x.Value.Namespace == namespaceName).ToList();
 
             if (includeOnly is not null)
             {
-                classesInNamespace = classesInNamespace.Where(x => includeOnly.Contains(x.Key)).ToList();
+                classesInNamespace = [.. classesInNamespace.Where(x => includeOnly.Contains(x.Key))];
             }
 
             if (exclude is not null)
             {
-                classesInNamespace = classesInNamespace.Where(x => !exclude.Contains(x.Key)).ToList();
+                classesInNamespace = [.. classesInNamespace.Where(x => !exclude.Contains(x.Key))];
             }
 
             if (classesInNamespace.Count < 1)
@@ -71,14 +77,18 @@ namespace Database
             return instances;
         }
 
-        public static void RegisterSingleton<T>(string key = null)
+        public static void RegisterSingleton<T>(string? key = null)
         {
-            if (key is null)
+            key ??= typeof(T).Name;
+
+            object? singleton = Factory.Create<T>();
+
+            if (singleton is null)
             {
-                key = typeof(T).Name;
+                throw new Exception("Object could not be created: " + typeof(T).Name);
             }
 
-            Instance.singletonItems.TryAdd(key, Factory.Create<T>());
+            Instance.singletonItems.TryAdd(key, singleton);
         }
 
         public static void Bind<T>(string key)
@@ -88,11 +98,11 @@ namespace Database
 
         public static T Get<T>(string key)
         {
-            if (Instance.singletonItems.TryGetValue(key, out object instance))
+            if (Instance.singletonItems.TryGetValue(key, out object? instance))
             {
                 return (T)instance;
             }
-            if (Instance.bindItems.TryGetValue(key, out Type type))
+            if (Instance.bindItems.TryGetValue(key, out Type? type))
             {
                 return (T)Factory.Create(type);
             }
@@ -102,12 +112,12 @@ namespace Database
         public static T Get<T>()
         {
             Type type = typeof(T);
-            var singleton = Instance.singletonItems.FirstOrDefault(x => x.Value.GetType().FullName.Equals(type.FullName));
+            var singleton = Instance.singletonItems.FirstOrDefault(x => x.Value.GetType().FullName?.Equals(type.FullName) == true);
             if (singleton.Value != null)
             {
                 return (T)singleton.Value;
             }
-            var bind = Instance.bindItems.FirstOrDefault(x => x.Value.FullName.Equals(type.FullName));
+            var bind = Instance.bindItems.FirstOrDefault(x => x.Value.FullName?.Equals(type.FullName) == true);
             if (bind.Value != null)
             {
                 return (T)Factory.Create(bind.Value);

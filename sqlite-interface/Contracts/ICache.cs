@@ -11,7 +11,7 @@ namespace Database.Contracts
     {
         void Store(string key, T value);
 
-        T Get(string key);
+        T? Get(string key);
 
         void Remove(string key);
 

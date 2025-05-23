@@ -14,11 +14,6 @@ namespace Database.Relations
     public class RelationManager
     {
         /// <summary>
-        /// The joins to be made.
-        /// </summary>
-        public List<IJoin> RegisteredJoins { get; private set; }
-
-        /// <summary>
         /// The relations loaded during runtime.
         /// </summary>
         public IDictionary<string, Relation> ActiveRelations { get; private set; }
@@ -32,29 +27,28 @@ namespace Database.Relations
         /// </summary>
         public RelationManager()
         {
-            this.RegisteredJoins = new List<IJoin>();
             this.ActiveRelations = new Dictionary<string, Relation>();
             this.EagerLoad = new List<ToLoad>();
         }
 
-        public static IJoin AddJoin<T>(string primaryKey, string foreignKey, RelationType type)
-        {
-            IJoin? join = null;
-            switch (type)
-            {
-                case RelationType.HasOne:
-                    join = new BelongsTo(typeof(T), foreignKey, primaryKey);
-                    break;
-                case RelationType.HasMany:
-                    join = new HasMany(typeof(T), foreignKey, primaryKey);
-                    break;
-                case RelationType.BelongsTo:
-                    join = new BelongsTo(typeof(T), primaryKey, foreignKey);
-                    break;
-            }
+        //public static IJoin AddJoin<T>(string primaryKey, string foreignKey, RelationType type)
+        //{
+        //    IJoin? join = null;
+        //    switch (type)
+        //    {
+        //        case RelationType.HasOne:
+        //            join = new BelongsTo(typeof(T), foreignKey, primaryKey);
+        //            break;
+        //        case RelationType.HasMany:
+        //            join = new HasMany(typeof(T), foreignKey, primaryKey);
+        //            break;
+        //        case RelationType.BelongsTo:
+        //            join = new BelongsTo(typeof(T), primaryKey, foreignKey);
+        //            break;
+        //    }
 
-            return join;
-        }
+        //    return join;
+        //}
 
         //public static IJoin AddBelongsToManyJoin<M, R, T>(string mainTablePrimaryKey, string targetTableKey)
         //{
@@ -121,10 +115,10 @@ namespace Database.Relations
         /// <summary>
         /// Resets the manager by clearing the registered joins.
         /// </summary>
-        public void Reset()
-        {
-            this.RegisteredJoins.Clear();
-        }
+        //public void Reset()
+        //{
+        //    this.RegisteredJoins.Clear();
+        //}
 
         //public void LoadRelations(IDictionary<string>)
 
@@ -241,7 +235,7 @@ namespace Database.Relations
             if (uncachedIds.Any())
             {
                 query = join.BuildQuery(foreignkey, uncachedIds.ToArray());
-                List<IModel> loadedModels = query.Get<Model>();
+                Collection loadedModels = query.Get();
 
                 // Cache newly loaded models
                 loadedModels.ForEach(m =>
@@ -296,6 +290,17 @@ namespace Database.Relations
             foreach (ToLoad relation in relations)
             {
                 LoadRelations(relation, models);
+            }
+        }
+
+        public static void LoadRelations(Collection items, Transactions.Transaction transaction)
+        {
+            if (items.Count > 0 && transaction.GetRelationsToLoad().Count > 0)
+            {
+                foreach (ToLoad relation in items.First().Relations.ToEagerLoad())
+                {
+                    LoadRelations(relation, items);
+                }
             }
         }
 

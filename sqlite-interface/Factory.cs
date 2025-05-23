@@ -17,7 +17,7 @@ namespace Database
 
             if (constructor != null)
             {
-                return (T)constructor.Invoke(new object[] { });
+                return (T)constructor.Invoke(Array.Empty<object>());
             }
 
             return Activator.CreateInstance<T>();
@@ -42,7 +42,7 @@ namespace Database
 
             if (constructor != null)
             {
-                return constructor.Invoke(new object[] { });
+                return constructor.Invoke(Array.Empty<object>());
             }
 
             return Activator.CreateInstance(type);
