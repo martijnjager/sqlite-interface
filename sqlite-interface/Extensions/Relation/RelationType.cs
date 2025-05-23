@@ -20,7 +20,7 @@ namespace Database.Extensions.Relation
         /// <returns>The <see cref="Join"/> instance.</returns>
         public static HasOne HasOne<T>(this IModel query, string foreignkey)
         {
-            return new HasOne(typeof(T), query.Attributes.PrimaryKey, foreignkey);
+            return new HasOne(query, typeof(T), query.Attributes.PrimaryKey, foreignkey);
         }
 
         /// <summary>
@@ -30,7 +30,7 @@ namespace Database.Extensions.Relation
         /// <returns>The <see cref="Join"/> instance.</returns>
         public static HasMany HasMany<T>(this IModel query, string foreignkey)
         {
-            return new HasMany(typeof(T), query.Attributes.PrimaryKey, foreignkey);
+            return new HasMany(query, typeof(T), query.Attributes.PrimaryKey, foreignkey);
         }
 
         /// <summary>
@@ -40,12 +40,12 @@ namespace Database.Extensions.Relation
         /// <typeparam name="T">The type of the relation.</typeparam>
         /// <param name="foreignId">The foreign key.</param>
         /// <returns>The <see cref="Join"/> instance.</returns>
-        public static BelongsTo BelongsTo<T>(this IModel query, string primaryKey)
+        public static BelongsTo BelongsTo<T>(this IModel query, string foreignKey, string primaryKey)
         {
-            MethodBase previousMethod = Stack.GetPreviousMethod();
-            string foreignKey = previousMethod.Name.ToSnakeCase() + "_id";
+            //MethodBase previousMethod = Stack.GetPreviousMethod();
+            //string foreignKey = previousMethod.Name.ToSnakeCase() + "_id";
 
-            return new BelongsTo(typeof(T), primaryKey, foreignKey);
+            return new BelongsTo(query, typeof(T), primaryKey, foreignKey);
         }
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace Database.Extensions.Relation
             string foreignKey = previousMethod.Name.ToSnakeCase() + "_id"; // role_id
             string primaryKey = query.GetTable().ToSnakeCase().Singular() + "_id"; // user_id
 
-            return new BelongsToMany(typeof(IntersectionTable), typeof(TargetTable), primaryKey, foreignKey);
+            return new BelongsToMany(query, typeof(IntersectionTable), typeof(TargetTable), primaryKey, foreignKey);
         }
     }
 }

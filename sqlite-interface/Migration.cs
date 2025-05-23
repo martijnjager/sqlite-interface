@@ -28,7 +28,7 @@ namespace Database
         private const string MIGRATION_LOCATION = "E:\\OneDrive\\Projects\\docker\\Server\\Server\\Database\\Migrations\\Tables\\";
         private const string MODEL_LOCATION = "E:\\OneDrive\\Projects\\docker\\Server\\Server\\Database\\Models\\";
 
-        public static Migration Instance => InstanceContainer.Get<Migration>();
+        public static Migration Instance => App.Get<Migration>();
 
         public Migration()
         {
@@ -63,7 +63,7 @@ namespace Database
         {
             RunDefaultMigration();
             MigrationModel model = new();
-            List<IModel> models = model.Get<Model>();
+            Collection models = model.Get();
 
             // Get the batch index of the last executed migration
             List<string> migrationsRun = models.ToDictionaryArray().Pluck("migration");
@@ -107,8 +107,9 @@ namespace Database
                     .Add("batch", newBatchIndex.ToString())
                     .Add("up", query, true)
                     .Add("down", queryDown, true);
-                model.Assign(bag);
-                model.Create<MigrationModel>();
+
+                model.SetAttributes(bag.ToDictionary());
+                model.Create();
                 Instance.RunSaveQuery(query);
                 BaseCommand.WriteLine("Finished migration");
                 Instance.Table = new Blueprint();
@@ -123,7 +124,7 @@ namespace Database
         public static void RunMigrationsDown()
         {
             MigrationModel model = new();
-            var batchIndex = model.OrderBy("batch", "desc").First<Model>()?.GetValue("batch");
+            var batchIndex = model.OrderBy("batch", "desc").First()?.GetValue("batch");
             List<IModel> models = model.Where("batch", batchIndex).Get();
             List<string> migrations= models.ToDictionaryArray().Pluck("down");
 

@@ -80,6 +80,9 @@ namespace Database.Migrations
         {
             AddTableNameIntoQuery(blueprint, query, true);
             AppendDefinitionsAndRelations(blueprint, query);
+
+            query.Replace(")", "");
+
             AppendIndexes(blueprint, query);
         }
 

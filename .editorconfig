@@ -1,0 +1,10 @@
+﻿[*.cs]
+
+# CA1822: Mark members as static
+dotnet_diagnostic.CA1822.severity = none
+
+# IDE0270: Use coalesce expression
+dotnet_diagnostic.IDE0270.severity = none
+
+# IDE0060: Remove unused parameter
+dotnet_diagnostic.IDE0060.severity = none

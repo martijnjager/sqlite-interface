@@ -1,18 +1,13 @@
-﻿using Database.Contracts;
-using Database.Contracts.Clause;
-using System;
-using System.Collections.Generic;
-using System.Configuration;
-using System.Data.SQLite;
-using System.Linq;
+﻿using Database.Contracts.Clause;
+using Database.QueryBuilder;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Database.Clauses
 {
     public class HavingClause : BaseClause, IHavingClause
     {
-        protected record Having (string Column, string Operator, string Value, string Boolean) : Base(Column, Value);
+        public new const string PREFIX = "@having";
+        protected record Having (string? Column, string? Operator, object? Value, string? Boolean, SubQuery? Subquery = null) : Base(Column, Value, Subquery);
 
         protected override void Add<T>(T condition)
         {
@@ -20,23 +15,29 @@ namespace Database.Clauses
             {
                 string[] exemptions = new[] { "(", ")" };
 
+                if (having.Value is RawSql)
+                {
+                    AddCondition(having);
+                    return;
+                }
+
                 if (!exemptions.Contains(having.Value))
                 {
-                    if (IsNull(having.Value))
+                    if (IsNull(having.Value.ToString()))
                     {
-                        string newValue = HandleValue(having, "@having", true);
+                        string newValue = HandleValue(having, PREFIX, true);
                         having = having with { Value = newValue };
                     }
                     else
                     {
                         if (having.Operator.Equals(Operator.In))
                         {
-                            string newValue = HandleInOperator(having, "@having");
+                            string newValue = HandleInOperator(having, PREFIX);
                             having = having with { Value = newValue };
                         }
                         else
                         {
-                            string newValue = HandleValue(having, "@having", true);
+                            string newValue = HandleValue(having, PREFIX, true);
                             having = having with { Value = newValue };
                         }
                     }
@@ -46,12 +47,12 @@ namespace Database.Clauses
             }
         }
 
-        public void AddHavingClause(string key, string op, string value)
+        public void AddHavingClause(string key, string op, object value)
         {
             AddCondition(new Having(key, op, value, "and"));
         }
 
-        public void AddOrHavingClause(string key, string op, string value)
+        public void AddOrHavingClause(string key, string op, object value)
         {
             AddCondition(new Having(key, op, value, "or"));
         }
@@ -94,9 +95,17 @@ namespace Database.Clauses
                     query.Append(havings[i].Boolean).Append(' ');
                 }
 
-                query.Append(havings[i].Column).Append(' ')
-                    .Append(havings[i].Operator).Append(' ')
-                    .Append($"@having{i}").Append(' ');
+                if (havings[i].Subquery is SubQuery)
+                {
+                    var subquery = this.CompileSubQuery(havings[i]);
+
+                    query.Append(subquery).Append(' ');
+                } else
+                {
+                    query.Append(havings[i].Column).Append(' ')
+                        .Append(havings[i].Operator).Append(' ')
+                        .Append($"{PREFIX}{i}").Append(' ');
+                }
             }
 
             return query.ToString();

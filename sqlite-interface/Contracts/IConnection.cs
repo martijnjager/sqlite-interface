@@ -1,4 +1,4 @@
-﻿using System.Data.SQLite;
+﻿using System.Data.Common;
 using Database.Enums;
 using Database.Transactions;
 
@@ -10,15 +10,15 @@ namespace Database.Contracts
 
         QueryResult<SaveStatus> RunQuery(Transaction query);
 
-        //Task<SQLiteDataReader> RunQueryAsync(string query);
+        //Task<DBDataReader> RunQueryAsync(string query);
 
         string GetDatabasePath();
 
         QueryResult<SaveStatus> Result { get; }
 
-        SQLiteConnection SqliteConnection();
+        DbConnection SqliteConnection();
 
-        void SetConnection(string source, string location);
+        void SetConnection(string source, string? location = null);
 
         bool IsOpen();
 

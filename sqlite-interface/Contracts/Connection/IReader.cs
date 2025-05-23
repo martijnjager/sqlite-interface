@@ -11,8 +11,8 @@ namespace Database.Contracts.Connection
 {
     internal interface IReader : IConnection
     {
-        Task<QueryResult<SaveStatus>> ReadAsync<T>(Transaction transaction) where T : IModel;
+        Task<QueryResult<SaveStatus>> ReadAsync(Transaction transaction);
  
-        List<IModel> Read<T>(ClauseManager clauseManager) where T : IModel;
+        Collection Read(Transaction transaction);
     }
 }

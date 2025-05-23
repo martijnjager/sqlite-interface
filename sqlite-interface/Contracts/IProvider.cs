@@ -9,6 +9,6 @@ namespace Database.Contracts
 {
     public interface IProvider
     {
-        void Boot(InstanceContainer instance);
+        void Boot(App instance);
     }
 }

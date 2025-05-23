@@ -1,7 +1,6 @@
 ﻿using Database.Contracts;
 using Database.Extensions.Model;
 using System.Data.Common;
-using System.Data.SQLite;
 using System.Text.Json.Serialization;
 
 namespace Database

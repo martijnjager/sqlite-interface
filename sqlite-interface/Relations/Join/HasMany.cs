@@ -1,11 +1,12 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using Database.Contracts;
+using Newtonsoft.Json.Linq;
 
 namespace Database.Relations.Join
 {
     public class HasMany : BaseJoin
     {
-        public HasMany(Type MainTable, string primaryKey, string foreignKey) 
-            : base(MainTable, primaryKey, foreignKey, RelationType.HasMany)
+        public HasMany(IModel model, Type TargetTable, string primaryKey, string foreignKey) 
+            : base(model, TargetTable, primaryKey, foreignKey, RelationType.HasMany)
         {
         }
 
@@ -16,7 +17,7 @@ namespace Database.Relations.Join
                 throw new Exception("No data provided for the relation.");
             }
 
-            Model m = InstanceContainer.ModelByKey(this.MainTable.Name) as Model;
+            Model m = ModelRegistry.ModelByKey(this.TargetTable.Name) as Model;
             return m.WhereIn(key, values);
         }
     }

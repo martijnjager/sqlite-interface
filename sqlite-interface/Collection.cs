@@ -1,11 +1,13 @@
-﻿using System;
+﻿using Database.Contracts;
+using Database.Contracts.Cache;
+using System;
 using System.Collections.Generic;
 using BaseCollection = Database.Collections.Collection;
 
 namespace Database
 {
     [Serializable]
-    public static class Collection
+    public class Collection : List<IModel>, ICacheable
     {
         //public Collection(List<Model> items) : base(items)
         //{

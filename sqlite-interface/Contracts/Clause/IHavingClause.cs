@@ -8,9 +8,9 @@ namespace Database.Contracts.Clause
 {
     public interface IHavingClause : IClause
     {
-        public void AddHavingClause(string key, string op, string value);
+        public void AddHavingClause(string key, string op, object value);
 
-        public void AddOrHavingClause(string key, string op, string value);
+        public void AddOrHavingClause(string key, string op, object value);
 
         public void AddNestedHavingClause(Action<Eloquent> callback, Eloquent model);
 

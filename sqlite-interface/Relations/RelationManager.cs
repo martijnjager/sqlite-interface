@@ -1,9 +1,9 @@
-﻿using Database.Contracts;
+﻿using Database.Cache;
+using Database.Contracts;
 using Database.Contracts.Relation;
 using Database.Extensions;
 using Database.Extensions.Model;
 using Database.Relations.Join;
-using System.Data.Entity.Core.Common.CommandTrees;
 using System.Reflection;
 
 namespace Database.Relations
@@ -14,45 +14,41 @@ namespace Database.Relations
     public class RelationManager
     {
         /// <summary>
-        /// The joins to be made.
-        /// </summary>
-        public List<IJoin> RegisteredJoins { get; private set; }
-
-        /// <summary>
         /// The relations loaded during runtime.
         /// </summary>
-        public IDictionary<string, Relation> LoadedRelations { get; private set; }
+        public IDictionary<string, Relation> ActiveRelations { get; private set; }
 
         protected List<ToLoad> EagerLoad { get; private set;}
+
+        private readonly ICache<IModel> cache = CacheFactory.GetOrCreate<IModel>("RelationModels");
 
         /// <summary>
         /// Initializes a new instance of the <see cref="RelationManager"/> class.
         /// </summary>
         public RelationManager()
         {
-            this.RegisteredJoins = new List<IJoin>();
-            this.LoadedRelations = new Dictionary<string, Relation>();
+            this.ActiveRelations = new Dictionary<string, Relation>();
             this.EagerLoad = new List<ToLoad>();
         }
 
-        public static IJoin AddJoin<T>(string primaryKey, string foreignKey, RelationType type)
-        {
-            IJoin? join = null;
-            switch (type)
-            {
-                case RelationType.HasOne:
-                    join = new BelongsTo(typeof(T), foreignKey, primaryKey);
-                    break;
-                case RelationType.HasMany:
-                    join = new HasMany(typeof(T), foreignKey, primaryKey);
-                    break;
-                case RelationType.BelongsTo:
-                    join = new BelongsTo(typeof(T), primaryKey, foreignKey);
-                    break;
-            }
+        //public static IJoin AddJoin<T>(string primaryKey, string foreignKey, RelationType type)
+        //{
+        //    IJoin? join = null;
+        //    switch (type)
+        //    {
+        //        case RelationType.HasOne:
+        //            join = new BelongsTo(typeof(T), foreignKey, primaryKey);
+        //            break;
+        //        case RelationType.HasMany:
+        //            join = new HasMany(typeof(T), foreignKey, primaryKey);
+        //            break;
+        //        case RelationType.BelongsTo:
+        //            join = new BelongsTo(typeof(T), primaryKey, foreignKey);
+        //            break;
+        //    }
 
-            return join;
-        }
+        //    return join;
+        //}
 
         //public static IJoin AddBelongsToManyJoin<M, R, T>(string mainTablePrimaryKey, string targetTableKey)
         //{
@@ -71,7 +67,7 @@ namespace Database.Relations
         /// <returns>True if the relation is loaded, false otherwise.</returns>
         public bool IsLoaded(string relation)
         {
-            return this.LoadedRelations.TryGetValue(relation, out _);
+            return this.ActiveRelations.TryGetValue(relation, out _);
         }
 
         /// <summary>
@@ -80,11 +76,11 @@ namespace Database.Relations
         /// <param name="key">The key of the relation.</param>
         /// <param name="model">The model to add to the relation.</param>
         /// <param name="type">The type of the relation.</param>
-        public void AddToLoadedRelation(string key, IModel model, RelationType type)
+        public void AddToActiveRelation(string key, IModel model, RelationType type)
         {
             if (this.IsLoaded(key))
             {
-                this.LoadedRelations[key].Models.Add(model);
+                this.ActiveRelations[key].Models.Add(model);
             }
             else
             {
@@ -93,7 +89,7 @@ namespace Database.Relations
                     Models = new List<IModel>() { model },
                     Type = type
                 };
-                this.LoadedRelations.Add(key, relation);
+                this.ActiveRelations.Add(key, relation);
             }
         }
 
@@ -104,7 +100,7 @@ namespace Database.Relations
         /// <returns>The loaded relation if it exists, null otherwise.</returns>
         public Relation? GetLoadedRelation(string key)
         {
-            return this.LoadedRelations.TryGetValue(key, out var relation) ? relation : null;
+            return this.ActiveRelations.TryGetValue(key, out var relation) ? relation : null;
         }
 
         /// <summary>
@@ -113,16 +109,16 @@ namespace Database.Relations
         /// <returns>A dictionary containing all the loaded relations.</returns>
         public IDictionary<string, Relation> GetLoadedRelations()
         {
-            return this.LoadedRelations;
+            return this.ActiveRelations;
         }
 
         /// <summary>
         /// Resets the manager by clearing the registered joins.
         /// </summary>
-        public void Reset()
-        {
-            this.RegisteredJoins.Clear();
-        }
+        //public void Reset()
+        //{
+        //    this.RegisteredJoins.Clear();
+        //}
 
         //public void LoadRelations(IDictionary<string>)
 
@@ -224,25 +220,63 @@ namespace Database.Relations
             }
 
             ids = models.Select(m => m.GetValue(primarykey)).Distinct().ToArray();
-            query = join.BuildQuery(foreignkey, ids);
-            List<IModel> loadedModels = query.Get<Model>();
 
-            foreach (IModel model in models)
-            { 
-                var modelsToConnect = loadedModels.Where(m => m.GetValue(foreignkey) == model.GetValue(primarykey));
+            ICache<IModel> cache = CacheFactory.GetOrCreate<IModel>("RelationModels");
 
-                if (relation.Children.Count > 0)
+            string cacheKeyName = join.TargetTable?.Name ?? join.MainTable.Name;
+
+            var uncachedIds = ids.Where(id =>
+            {
+                string cacheKey = CacheFactory.GenerateCacheKey(cacheKeyName, id);
+                return cache.Get(cacheKey) is null;
+            });
+            var cachedIds = ids.Except(uncachedIds);
+
+            if (uncachedIds.Any())
+            {
+                query = join.BuildQuery(foreignkey, uncachedIds.ToArray());
+                Collection loadedModels = query.Get();
+
+                // Cache newly loaded models
+                loadedModels.ForEach(m =>
                 {
-                    relation.Children.ForEach(child =>
+                    string id = m.GetValue(m.Attributes.PrimaryKey).ToString();
+                    string key = CacheFactory.GenerateCacheKey(cacheKeyName, id);
+                    cache.Store(key, m);
+                });
+
+                foreach (IModel model in models)
+                {
+                    var modelsToConnect = loadedModels.Where(m => 
+                        m.GetValue(foreignkey) == model.GetValue(primarykey)
+                    );
+
+                    foreach (Model m in modelsToConnect.Cast<Model>())
                     {
-                        LoadRelations(child, loadedModels);
-                    });
+                        model.Relations.AddToActiveRelation(relation.Key, m, join.Type);
+                    }
                 }
+            }
 
-                foreach (Model m in modelsToConnect.Cast<Model>())
+            foreach (IModel model in models) 
+            {
+                string lookupId = model.GetValue(primarykey).ToString();
+                string cacheKey = CacheFactory.GenerateCacheKey(cacheKeyName, lookupId);
+
+                if (cache.Get(cacheKey) is IModel cachedModel)
                 {
-                    model.Relations.AddToLoadedRelation(relation.Key, m, join.Type);
+                    model.Relations.AddToActiveRelation(relation.Key, cachedModel, join.Type);
                 }
+            }
+
+            if (relation.Children.Count >0)
+            {
+                var allModels = models.SelectMany(m => m.Relations.GetLoadedRelation(relation.Key)?.Models ?? new List<IModel>());
+
+                relation.Children.ForEach(relation =>
+                {
+                    LoadRelations(relation, allModels);
+                });
             }
         }
 
@@ -256,6 +290,17 @@ namespace Database.Relations
             foreach (ToLoad relation in relations)
             {
                 LoadRelations(relation, models);
+            }
+        }
+
+        public static void LoadRelations(Collection items, Transactions.Transaction transaction)
+        {
+            if (items.Count > 0 && transaction.GetRelationsToLoad().Count > 0)
+            {
+                foreach (ToLoad relation in items.First().Relations.ToEagerLoad())
+                {
+                    LoadRelations(relation, items);
+                }
             }
         }
 

@@ -3,26 +3,15 @@ using Database.Contracts;
 using Database.Contracts.Connection;
 using Database.Enums;
 using Database.Transactions;
-using System;
-using System.Collections.Generic;
 using System.Collections.ObjectModel;
-using System.Data;
 using System.Data.Common;
-using System.Data.SQLite;
-using System.Linq;
-using System.Text;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Database.Extensions;
 using Database.Relations;
 
 namespace Database.Connection
 {
-    internal class Reader : BaseConnection, IReader
+    internal class Reader(string? location = null, string? source = null) : BaseConnection(location, source), IReader
     {
-        public Reader(string? location = null, string? source = null) : base(location, source)
-        {
-        }
 
         /// <summary>
         /// Processes the query and reads the data from the database.
@@ -30,11 +19,10 @@ namespace Database.Connection
         /// <typeparam name="T">The type of the models.</typeparam>
         /// <param name="query">The query to process.</param>
         /// <returns>A list of models.</returns>
-        public List<IModel> Read<T>(ClauseManager clauseManager) where T : IModel
+        public Collection Read(Transactions.Transaction transaction)
         {
-            List<IModel> items = new();
+            Collection items = new();
 
-            Transaction transaction = clauseManager.Compile();
             QueryResult<SaveStatus> result = base.RunQuery(transaction);
 
             if (result.Reader is null)
@@ -44,39 +32,28 @@ namespace Database.Connection
 
             DbDataReader reader = result.Reader;
 
-            var defaultColumns = this.GetColumns(reader, clauseManager);
+            var defaultColumns = this.GetColumns(reader);
 
-            string table = defaultColumns.FirstOrDefault().BaseTableName;
-
-            table = table.RemoveSpecialCharacters();
+            string table = this.GetTableName(reader);
 
             while (result.Reader.Read())
             {
-                IModel? mainModel = MapToModel<T>(result.Reader, table, defaultColumns);
-
-                if (mainModel is not null)
+                if (MapToModel(result.Reader, table, defaultColumns) is IModel mainModel)
                 {
                     items.Add(mainModel);
                 }
             }
 
-            if (items.Count > 0 && items.First().Relations.CanEagerLoad())
-            { 
-                foreach (ToLoad relation in items.First().Relations.ToEagerLoad())
-                {
-                    RelationManager.LoadRelations(relation, items);
-                }
-            }
+            RelationManager.LoadRelations(items, transaction);
 
             result.Reader.Close();
-            transaction.Close();
 
             return items;
         }
 
-        public async Task<QueryResult<SaveStatus>> ReadAsync<T>(Transaction transaction) where T : IModel
+        public async Task<QueryResult<SaveStatus>> ReadAsync(Transaction transaction)
         {
-            List<IModel> items = new();
+            Collection items = new();
             Result = new QueryResult<SaveStatus>();
             Result.SetStatus(SaveStatus.Pending);
 
@@ -92,7 +69,7 @@ namespace Database.Connection
                     if (schemaTable is not null)
                     {
                         string table = schemaTable.FirstOrDefault().BaseTableName;
-                        IModel? model = MapToModel<T>(reader, table, reader.GetColumnSchema());
+                        IModel? model = MapToModel(reader, table, reader.GetColumnSchema());
                         if (model is not null)
                         {
                             items.Add(model);
@@ -113,10 +90,10 @@ namespace Database.Connection
             return Result;
         }
 
-        private static IModel? MapToModel<T>(DbDataReader reader, string table, ReadOnlyCollection<DbColumn> defaultColumns) where T : IModel
+        private static IModel? MapToModel(DbDataReader reader, string table, ReadOnlyCollection<DbColumn> defaultColumns)
         {
             ParamBag paramBag = new();
-            IModel? mainModel = InstanceContainer.ModelByKey(table, defaultColumns);
+            IModel? mainModel = ModelRegistry.ModelByKey(table, defaultColumns);
 
             if (mainModel is null)
             {
@@ -137,7 +114,7 @@ namespace Database.Connection
                 paramBag.Add(key, value);
             }
 
-            mainModel.Assign(paramBag);
+            mainModel.Attributes.AssignByReader(paramBag);
 
             return mainModel;
         }
@@ -148,15 +125,20 @@ namespace Database.Connection
         /// <param name="reader"></param>
         /// <param name="clauseManager"></param>
         /// <returns></returns>
-        protected ReadOnlyCollection<DbColumn>? GetColumns(DbDataReader reader, ClauseManager clauseManager)
+        protected ReadOnlyCollection<DbColumn>? GetColumns(DbDataReader reader)
         {
             var columns = reader.GetColumnSchema();
 
-            List<DbColumn> modifiableColumns = new List<DbColumn>(columns);
+            List<DbColumn> modifiableColumns = [.. columns];
 
-            modifiableColumns.RemoveAll(column => clauseManager.ExcludeColumns.Contains(column.ColumnName));
+            //modifiableColumns.RemoveAll(column => builder.ExcludeColumns.Contains(column.ColumnName));
 
             return new ReadOnlyCollection<DbColumn>(modifiableColumns);
+        }
+
+        protected string GetTableName(DbDataReader reader)
+        {
+            return reader.GetColumnSchema().FirstOrDefault().BaseTableName?.RemoveSpecialCharacters() ?? string.Empty;
         }
     }
 }

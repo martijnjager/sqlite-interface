@@ -6,12 +6,8 @@ using System.Threading.Tasks;
 
 namespace Database.Contracts
 {
-    public interface IInstanceContainer
+    internal interface IClearable
     {
-        T GetInstance<T>(string key);
-
-        T GetInstance<T>();
-
-        void SetSingleton(object instance, string key);
+        void Clear();
     }
 }

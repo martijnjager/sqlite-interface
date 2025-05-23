@@ -23,5 +23,15 @@ namespace Database.Extensions.Model
 
             return results;
         }
+
+        public static List<IModel> Load(this List<IModel> models, string relations)
+        {
+            foreach (IModel model in models)
+            {
+                model.Load(relations);
+            }
+
+            return models;
+        }
     }
 }

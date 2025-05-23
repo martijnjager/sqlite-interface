@@ -13,11 +13,11 @@ namespace Database.Contracts
 
         IModel FindBy(string key, string value, string? relations = null, string[]? except = null);
 
-        List<IModel> FindWhere(string key, string value, string? relations = null, string[]? except = null);
+        Collection FindWhere(string key, string value, string? relations = null, string[]? except = null);
 
         IModel Get(string id, string? relations = null);
 
-        List<IModel> All(string? relations = null);
+        Collection All(string? relations = null);
 
         void SetModel(TModel model);
 

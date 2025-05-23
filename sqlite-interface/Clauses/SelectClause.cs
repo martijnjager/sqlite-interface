@@ -1,25 +1,21 @@
-﻿using Database.Clauses;
-using Database.Contracts;
-using Database.Contracts.Clause;
-using System;
-using System.Collections.Generic;
-using System.Data.SQLite;
-using System.Linq;
+﻿using Database.Contracts.Clause;
+using System.Data.Common;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Database.Clauses
 {
     public class SelectClause : BaseClause, ISelectClause
     {
+        protected record Select(string? Column, object? Value, SubQuery? Subquery = null): Base(Column, Value, Subquery);
+
         public void AddColumn(string column, string alias = "")
         {
-            Add(new Base(column, alias));
+            Add(new Select(column, alias));
         }
 
         protected override void Add<T>(T condition)
         {
-            if (condition is Base select)
+            if (condition is Select select)
             {
                 AddCondition(select);
             }
@@ -29,7 +25,7 @@ namespace Database.Clauses
         {
             StringBuilder query = new("SELECT ");
 
-            Base[] selects = this.GetConditions<Base>();
+            Select[] selects = this.GetConditions<Select>();
 
             if (selects.Length == 0)
             {
@@ -43,17 +39,26 @@ namespace Database.Clauses
                     {
                         query.Append(", ");
                     }
-                    query.Append(selects[i].Column);
-                    if (!string.IsNullOrEmpty(selects[i].Value))
+
+                    if (selects[i].Subquery is SubQuery)
                     {
-                        query.Append(" AS ").Append(selects[i].Value);
+                        var subquery = this.CompileSubQuery(selects[i]);
+
+                        query.Append(subquery).Append(' ');
+                    } else
+                    {
+                        query.Append(selects[i].Column);
+                        if (!string.IsNullOrEmpty(selects[i].Value as string))
+                        {
+                            query.Append(" AS ").Append(selects[i].Value);
+                        }
                     }
                 }
             }
             return query.ToString();
         }
 
-        public new void Bind(SQLiteCommand command)
+        public new void Bind(DbCommand command)
         {
             // No binding required
         }

@@ -1,4 +1,5 @@
-﻿using System;
+﻿using Database.Contracts;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -8,8 +9,8 @@ namespace Database.Relations.Join
 {
     public class BelongsToMany : BaseJoin
     {
-        public BelongsToMany(Type IntersectionTable, Type TargetTable, string primaryKey, string foreignKey) 
-            : base(IntersectionTable, TargetTable, primaryKey, foreignKey, RelationType.BelongsToMany)
+        public BelongsToMany(IModel model, Type IntersectionTable, Type TargetTable, string primaryKey, string foreignKey) 
+            : base(model, IntersectionTable, TargetTable, primaryKey, foreignKey, RelationType.BelongsToMany)
         {
         }
 
@@ -20,7 +21,7 @@ namespace Database.Relations.Join
                 throw new Exception("No data provided for the relation.");
             }
 
-            Model m = InstanceContainer.ModelByKey(this.TargetTable.Name) as Model;
+            Model m = ModelRegistry.ModelByKey(this.TargetTable.Name) as Model;
             return m.Join(this.IntersectionTable.Name, this.PrimaryKey, "=", this.ForeignKey)
                 .Where(key, value[0]);
         }

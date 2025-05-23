@@ -1,17 +1,15 @@
 ﻿using Database.Contracts.Clause;
-using System;
-using System.Collections.Generic;
-using System.Data.Entity.ModelConfiguration.Configuration;
-using System.Data.SQLite;
-using System.Linq;
+using Database.Contracts.Relation;
+using Database.QueryBuilder;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace Database.Clauses
 {
     public class WhereClause : BaseClause, IWhereClause
     {
-        protected record Where(string Column, string Operator, string Value, string Boolean) : Base(Column, Value);
+        public new const string PREFIX = "@where";
+
+        protected record Where(string? Column = null, string? Operator = null, object? Value = null, string? Boolean = null, SubQuery? Subquery = null) : Base(Column, Value, Subquery);
 
         protected override void Add<T>(T condition)
         {
@@ -19,23 +17,29 @@ namespace Database.Clauses
             {
                 string[] exemptions = new[] { "(", ")" };
 
+                if (whereCondition.Value is RawSql)
+                {
+                    AddCondition(whereCondition);
+                    return;
+                }
+
                 if (!exemptions.Contains(whereCondition.Value))
                 {
-                    if (IsNull(whereCondition.Value))
+                    if (IsNull(whereCondition.Value.ToString()))
                     {
-                        string newValue = HandleValue(whereCondition, "@where", true);
+                        string newValue = HandleValue(whereCondition, PREFIX, true);
                         whereCondition = whereCondition with { Value = newValue };
                     }
                     else
                     {
                         if (whereCondition.Operator.Equals(Operator.In))
                         {
-                            string newValue = HandleInOperator(whereCondition, "@where");
+                            string newValue = HandleInOperator(whereCondition, PREFIX);
                             whereCondition = whereCondition with { Value = newValue };
                         }
                         else
                         {
-                            string newValue = HandleValue(whereCondition, "@where", false);
+                            string newValue = HandleValue(whereCondition, PREFIX, false);
                             whereCondition = whereCondition with { Value = newValue };
                         }
                     }
@@ -45,12 +49,12 @@ namespace Database.Clauses
             }
         }
 
-        public void AddWhereClause(string key, string op, string value)
+        public void AddWhereClause(string key, string op, object value)
         {
             Add(new Where(key, op, value, "and"));
         }
 
-        public void AddOrWhereClause(string key, string op, string value)
+        public void AddOrWhereClause(string key, string op, object value)
         {
             Add(new Where(key, op, value, "or"));
         }
@@ -62,24 +66,36 @@ namespace Database.Clauses
             Add(new Where("", "", ")", "and"));
         }
 
-        public void AddWhereHasClause(string relation, Action<Eloquent> callback, Eloquent model)
+        public void AddWhereHasClause(string relation, Action<Eloquent> callback, Eloquent model, IJoin join)
         {
-            Add(new Where(relation, Operator.Exists, "(", ""));
             callback(model);
-            Add(new Where("", "", ")", "and"));
+            var subqueryClause = new SubQuery(model, SubQueryType.Exists);
+            AddCondition(new Where(relation, "", "", "and", subqueryClause));
         }
 
-        public void AddWhereHasNotClause(string relation, Action<Eloquent> callback, Eloquent model)
+        public void AddWhereHasClause(string relation, Eloquent model, IJoin join)
         {
-            Add(new Where(relation, Operator.NotExists, "(", ""));
+            var subqueryClause = new SubQuery(model, SubQueryType.Exists);
+            AddCondition(new Where(relation, "", "", "and", subqueryClause));
+        }
+
+        public void AddWhereHasNotClause(string relation, Action<Eloquent> callback, Eloquent model, IJoin join)
+        {
             callback(model);
-            Add(new Where("", "", ")", "and"));
+            var subqueryClause = new SubQuery(model, SubQueryType.NotExists);
+            AddCondition(new Where(relation, "", "", "and", subqueryClause));
+        }
+
+        public void AddWhereHasNotClause(string relation, Eloquent model, IJoin join)
+        {
+            var subqueryClause = new SubQuery(model, SubQueryType.NotExists);
+            AddCondition(new Where(relation, "", "", "and", subqueryClause));
         }
 
         public void AddWhereInClause(string key, params object[] values)
         {
             StringBuilder stringBuilder = new("");
-            if (values.GetType().Name == "Object[]")
+            if (values.GetType().Name.Contains("[]"))
             {
                 if (values[0] is List<string> ||
                     values[0] is List<int> ||
@@ -130,9 +146,24 @@ namespace Database.Clauses
                     query.Append(wheres[i].Boolean).Append(' ');
                 }
 
-                query.Append(wheres[i].Column).Append(' ')
-                    .Append(wheres[i].Operator).Append(' ')
-                    .Append(wheres[i].Value).Append(' ');
+                if (wheres[i].Subquery is SubQuery)
+                {
+                    var subquery = this.CompileSubQuery(wheres[i]);
+
+                    query.Append(subquery).Append(' ');
+                } else
+                {
+                    query.Append(wheres[i].Column).Append(' ')
+                   .Append(wheres[i].Operator).Append(' ');
+
+                    if (wheres[i].Value is RawSql raw)
+                    {
+                        query.Append(raw.Value).Append(' ');
+                    } else
+                    {
+                        query.Append(wheres[i].Value).Append(' ');
+                    }
+                }
             }
 
             query.Remove(query.Length - 1, 1);

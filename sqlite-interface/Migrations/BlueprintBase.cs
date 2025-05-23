@@ -82,6 +82,12 @@ namespace Database.Migrations
             return this;
         }
 
+        public BlueprintBase Json(string value)
+        {
+            this.AddItem(value, "JSON NOT NULL");
+            return this;
+        }
+
         /// <summary>
         /// Sets the name of the table.
         /// </summary>

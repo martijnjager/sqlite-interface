@@ -15,7 +15,7 @@ namespace Database.Extensions
     {
         public static object ToType(this Database.Model originModel, Type conversionType)
         {
-            var model = InstanceContainer.Create(conversionType);
+            var model = App.Create(conversionType);
 
             string[] fields = new[] {
                 "Attributes",

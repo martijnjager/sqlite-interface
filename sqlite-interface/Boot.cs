@@ -3,11 +3,11 @@ using Database.Console;
 using Database.Console.Commands;
 using Database.Console.Commands.Migration;
 using Database.Grammar;
-using System;
 using Command = Database.Console.BaseCommand;
 using Database.Transactions;
 using System.Reflection;
-using Database.Events;
+using Database.Relations;
+using Database.Cache;
 
 namespace Database
 {
@@ -15,61 +15,62 @@ namespace Database
     {
         public static void Start(Assembly executingAssembly)
         {
-            InstanceContainer.RegisterSingleton<ParamBag>();
-            InstanceContainer.RegisterSingleton<GrammarCompiler>();
-            InstanceContainer.RegisterSingleton<Command>();
-            InstanceContainer.RegisterSingleton<Configuration>();
-            InstanceContainer.RegisterSingleton<Provider>();
-            InstanceContainer.RegisterSingleton<Migration>();
-            InstanceContainer.RegisterSingleton<TransactionManager>();
-            InstanceContainer.RegisterSingleton<Events.Dispatcher>();
-            InstanceContainer.RegisterSingleton<Dispatcher>();
+            App.RegisterSingleton<ParamBag>();
+            App.RegisterSingleton<GrammarCompiler>();
+            App.RegisterSingleton<Command>();
+            App.RegisterSingleton<Configuration>();
+            App.RegisterSingleton<Provider>();
+            App.RegisterSingleton<Migration>();
+            App.RegisterSingleton<TransactionManager>();
+            App.RegisterSingleton<Events.Dispatcher>();
+            App.RegisterSingleton<JobDispatcher>();
             //Command.RegisterCommand<Migrate>();
             //Command.RegisterCommand<RevertMigrate>();
             //Command.RegisterCommand<Make>();
-            InstanceContainer.LoadMigrationTypes(executingAssembly);
-            InstanceContainer.LoadModelTypes(executingAssembly);
+            MigrationRegistry.LoadMigrationTypes(executingAssembly);
+            ModelRegistry.LoadModelTypes(executingAssembly);
+            RegisterProvider<CacheInvalidatorProvider>();
         }
 
         public static void RegisterProvider<T>()
         {
-            InstanceContainer.Get<Provider>().Register<T>();
+            App.Get<Provider>().Register<T>();
         }
 
-        public static ParamBag ParamBag(this InstanceContainer app)
+        public static ParamBag ParamBag(this App app)
         {
-            return app.GetInstance<ParamBag>();
+            return App.Get<ParamBag>();
         }
 
-        public static Command BaseCommand(this InstanceContainer app)
+        public static Command BaseCommand(this App app)
         {
-            return app.GetInstance<Command>();
+            return App.Get<Command>();
         }
 
-        public static Configuration Configuration(this InstanceContainer app)
+        public static Configuration Configuration(this App app)
         {
-            return app.GetInstance<Configuration>();
+            return App.Get<Configuration>();
         }
 
-        public static TransactionManager ConnectionManager(this  InstanceContainer app)
+        public static TransactionManager ConnectionManager(this  App app)
         {
-            return app.GetInstance<TransactionManager>();
+            return App.Get<TransactionManager>();
         }
 
-        public static void Restart(this InstanceContainer app)
+        public static void Restart(this App app)
         {
             //System.Diagnostics.Process.Start(AppDomain.CurrentDomain.FriendlyName);
             //Environment.Exit(0);
         }
 
-        internal static Events.Dispatcher EventDispatcher(this InstanceContainer app)
+        public static Events.Dispatcher EventDispatcher(this App app)
         {
-            return app.GetInstance<Events.Dispatcher>();
+            return App.Get<Events.Dispatcher>();
         }
 
-        public static Dispatcher Dispatcher(this InstanceContainer app)
+        public static JobDispatcher Dispatcher(this App app)
         {
-            return app.GetInstance<Dispatcher>();
+            return App.Get<JobDispatcher>();
         }
     }
 }

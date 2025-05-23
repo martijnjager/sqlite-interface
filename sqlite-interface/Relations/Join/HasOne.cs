@@ -1,4 +1,5 @@
-﻿using Database.Relations;
+﻿using Database.Contracts;
+using Database.Relations;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,8 +10,8 @@ namespace Database.Relations.Join
 {
     public class HasOne : BaseJoin
     {
-        public HasOne(Type MainTable, string primaryKey, string foreignKey) 
-            : base(MainTable, primaryKey, foreignKey, RelationType.HasOne)
+        public HasOne(IModel model, Type TargetTable, string primaryKey, string foreignKey) 
+            : base(model, TargetTable, primaryKey, foreignKey, RelationType.HasOne)
         {
         }
 
@@ -21,8 +22,8 @@ namespace Database.Relations.Join
                 throw new Exception("No data provided for the relation.");
             }
 
-            Model m = InstanceContainer.ModelByKey(this.MainTable.Name) as Model;
-            return m.Where(key, value[0]);
+            Model m = ModelRegistry.ModelByKey(this.TargetTable.Name) as Model;
+            return m.WhereIn(key, value);
         }
     }
 }

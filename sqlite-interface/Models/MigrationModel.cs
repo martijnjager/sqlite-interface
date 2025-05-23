@@ -11,6 +11,14 @@ using System.Threading.Tasks;
 
 namespace Database.Models
 {
+    [Property("id")]
+    [Property("migration")]
+    [Property("up")]
+    [Property("down")]
+    [Property("batch")]
+    [Property("created_at")]
+    [Property("updated_at")]
+    [Property("deleted_at")]
     [TableName("migrations")]
     internal class Migration : Model, IUseTimestamps
     {

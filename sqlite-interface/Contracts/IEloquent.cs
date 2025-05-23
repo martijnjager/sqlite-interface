@@ -9,13 +9,15 @@ namespace Database.Contracts
 
         IDictionary<string, string> GetAttributes();
 
+        IDictionary<string, dynamic> GetCustomAttributes();
+
         IList<string> GetRawAttributes();
 
         IDictionary<string, Relations.Relation> GetRelations();
 
         string GetTable();
 
-        IModel? Find<T>(string key) where T : IModel;
+        IModel? Find(string key);
 
         Eloquent Select(params string[] columns);
 
@@ -23,32 +25,40 @@ namespace Database.Contracts
 
         Eloquent Join(string table, string key, string op, string value);
 
-        Eloquent Where(string key, string op, string value);
+        Eloquent Where(string key, object op, object value);
 
         Eloquent WhereNull(string where);
 
         Eloquent WhereNotNull(string where);
 
-        Eloquent OrWhere(string key, string op, string value);
+        Eloquent OrWhere(string key, object op, object value);
 
         Eloquent Where(Action<Eloquent> callback);
 
+        Eloquent WhereHas(string relation, Action<Eloquent> callback);
+
+        Eloquent WhereHas(string relation);
+
+        Eloquent WhereDoesntHave(string relation, Action<Eloquent> callback);
+
+        Eloquent WhereDoesntHave(string relation);
+
         Eloquent GroupBy(string key);
 
-        Eloquent Having(string key, string op, string value);
+        Eloquent Having(string key, object op, object value);
 
         Eloquent Limit(int limit);
 
         Eloquent WithTrashed();
 
-        List<IModel> Get<T>() where T : IModel;
+        Collection Get();
 
-        IModel? First<T>() where T : IModel;
+        IModel? First();
 
-        IModel? Create<T>() where T : IModel;
+        IModel? Create();
 
-        IModel? Update<T>() where T : IModel;
+        IModel? Update();
 
-        List<IModel> CreateMany<T>(ParamBag[] bags) where T : IModel;
+        Collection CreateMany(ParamBag[] bags);
     }
 }
